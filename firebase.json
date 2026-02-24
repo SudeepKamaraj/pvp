@@ -1,0 +1,32 @@
+{
+    "firestore": {
+        "rules": "firestore.rules",
+        "indexes": "firestore.indexes.json"
+    },
+    "storage": {
+        "rules": "storage.rules"
+    },
+    "flutter": {
+        "platforms": {
+            "android": {
+                "default": {
+                    "projectId": "pvp-traders-app-5ed1e",
+                    "appId": "1:681893406474:android:9808a0b40ac9ee83957cf3",
+                    "fileOutput": "android/app/google-services.json"
+                }
+            },
+            "dart": {
+                "lib/firebase_options.dart": {
+                    "projectId": "pvp-traders-app-5ed1e",
+                    "configurations": {
+                        "android": "1:681893406474:android:9808a0b40ac9ee83957cf3",
+                        "ios": "1:681893406474:ios:7471a5373dced522957cf3",
+                        "macos": "1:681893406474:ios:7471a5373dced522957cf3",
+                        "web": "1:681893406474:web:f7003f3833fa2585957cf3",
+                        "windows": "1:681893406474:web:78ca59a449f5abb6957cf3"
+                    }
+                }
+            }
+        }
+    }
+}

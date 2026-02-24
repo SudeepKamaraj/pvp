@@ -1,0 +1,106 @@
+import 'package:flutter/material.dart';
+import 'package:get/get.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../controllers/admin_marketing_controller.dart';
+
+class AdminOffersScreen extends StatelessWidget {
+  const AdminOffersScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final AdminMarketingController controller = Get.put(AdminMarketingController());
+
+    return Scaffold(
+      backgroundColor: Get.theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text("Offers & Coupons", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Get.theme.textTheme.displayLarge?.color)),
+        centerTitle: true,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios, color: Get.theme.iconTheme.color), onPressed: () => Get.back()),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(color: Get.theme.cardColor, borderRadius: BorderRadius.circular(20)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                   Text("CREATE NEW COUPON", style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                   const SizedBox(height: 16),
+                   TextField(
+                     controller: controller.couponCodeController,
+                     style: TextStyle(color: Get.theme.textTheme.bodyLarge?.color),
+                     decoration: InputDecoration(
+                       hintText: "Coupon Code (e.g. SUMMER20)",
+                       filled: true,
+                       fillColor: Get.theme.scaffoldBackgroundColor,
+                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                     ),
+                   ),
+                   const SizedBox(height: 12),
+                   TextField(
+                     controller: controller.discountController,
+                     style: TextStyle(color: Get.theme.textTheme.bodyLarge?.color),
+                     keyboardType: TextInputType.number,
+                     decoration: InputDecoration(
+                       hintText: "Discount Percentage (e.g. 20)",
+                       filled: true,
+                       fillColor: Get.theme.scaffoldBackgroundColor,
+                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                       suffixText: "%",
+                     ),
+                   ),
+                   const SizedBox(height: 16),
+                   SizedBox(
+                     width: double.infinity,
+                     child: Obx(() => ElevatedButton(
+                       onPressed: controller.isLoading.value ? null : () => controller.createCoupon(),
+                       style: ElevatedButton.styleFrom(
+                         backgroundColor: Colors.red,
+                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                         padding: const EdgeInsets.symmetric(vertical: 16),
+                       ),
+                       child: Text("Create Coupon", style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold)),
+                     )),
+                   )
+                ],
+              ),
+            ),
+            const SizedBox(height: 30),
+            
+            Expanded(
+              child: Obx(() => ListView.builder(
+                itemCount: controller.coupons.length,
+                itemBuilder: (context, index) {
+                  final coupon = controller.coupons[index];
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(color: Get.theme.cardColor, borderRadius: BorderRadius.circular(16)),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(coupon['code'], style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.2, color: Get.theme.textTheme.displayLarge?.color)),
+                            Text("${coupon['discount']}% OFF", style: GoogleFonts.poppins(color: Colors.green, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                        IconButton(icon: const Icon(Icons.delete, color: Colors.grey), onPressed: () => controller.deleteCoupon(coupon['id'])),
+                      ],
+                    ),
+                  );
+                },
+              )),
+            )
+          ],
+        ),
+      ),
+    );
+  }
+}

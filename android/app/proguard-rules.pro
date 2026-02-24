@@ -1,0 +1,9 @@
+-keep class com.razorpay.** { *; }
+-dontwarn com.razorpay.**
+-keepattributes Signature
+-keepattributes *Annotation*
+-dontwarn com.google.android.gms.**
+-keep class com.google.android.gms.** { *; }
+-keep interface com.razorpay.PaymentResultListener { *; }
+-keep interface com.razorpay.ExternalWalletListener { *; }
+-keep class com.razorpay.AnalyticsUtil { *; }
