@@ -6,13 +6,16 @@ import '../controllers/login_controller.dart';
 import 'package:pvp_traders/core/constants/app_assets.dart';
 
 import '../../admin/views/admin_login_screen.dart';
+import 'phone_login_screen.dart';
+import 'email_login_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final LoginController controller = Get.put(LoginController());
+    // Get or create controller (don't delete on rebuild)
+    final LoginController controller = Get.put(LoginController(), tag: 'login');
 
     return Scaffold(
       backgroundColor: Get.theme.scaffoldBackgroundColor,
@@ -180,28 +183,99 @@ class LoginScreen extends StatelessWidget {
                         children: [
                           const Icon(Icons.g_mobiledata, size: 32, color: Colors.blue), 
                           const SizedBox(width: 12),
-                          Text(
-                            "google_login".tr,
-                            style: GoogleFonts.poppins(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                              color: Get.theme.textTheme.bodyLarge?.color,
+                          Flexible(
+                            child: Text(
+                              "google_login".tr,
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Get.theme.textTheme.bodyLarge?.color,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
                       ),
                     )),
                   ),
-                  
-                  const SizedBox(height: 32),
+                                    const SizedBox(height: 16),
+
+                  // Phone Login
+                  SizedBox(
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: () => Get.to(() => const PhoneLoginScreen(isSignup: false)),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.phone_android, size: 24, color: AppColors.primary),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              "phone_login".tr,
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Get.theme.textTheme.bodyLarge?.color,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Email OTP Login
+                  SizedBox(
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: () => Get.to(() => const EmailLoginScreen(isSignup: false)),
+                      style: OutlinedButton.styleFrom(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        side: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.email_outlined, size: 24, color: AppColors.primary),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Text(
+                              "email_otp_login".tr,
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: Get.theme.textTheme.bodyLarge?.color,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                                    const SizedBox(height: 32),
 
                   // Sign Up Prompt
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Text(
-                        "no_account".tr,
-                        style: GoogleFonts.poppins(color: const Color(0xFF666666)),
+                      Flexible(
+                        child: Text(
+                          "no_account".tr,
+                          style: GoogleFonts.poppins(color: const Color(0xFF666666)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                       TextButton(
                         onPressed: controller.goToSignUp,

@@ -2,6 +2,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:get/get.dart';
 import '../../../../data/models/product_model.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../data/services/database_service.dart';
 import '../../../../core/constants/app_assets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -40,35 +41,50 @@ class HomeController extends GetxController {
     try {
       // Check if user is admin - don't show offer to admin
       final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser != null) {
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(currentUser.uid)
-            .get();
-        
-        if (userDoc.exists) {
-          final role = userDoc.data()?['role']?.toString().toLowerCase();
-          if (role == 'admin') {
-            return; // Don't show offer to admin users
-          }
+      if (currentUser == null) return;
+      
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .get();
+      
+      if (userDoc.exists) {
+        final role = userDoc.data()?['role']?.toString().toLowerCase();
+        if (role == 'admin') {
+          return; // Don't show offer to admin users
         }
       }
       
       final offer = await _databaseService.getCurrentOffer();
       if (offer != null) {
-        // Delay slightly to let UI build, then show dialog
-        Future.delayed(const Duration(seconds: 2), () {
-          if (Get.context != null) {
-            _showFestivalOfferDialog(offer);
-          }
-        });
+        // Fetch user's personal coupon code
+        final couponSnapshot = await FirebaseFirestore.instance
+            .collection('coupons')
+            .where('userId', isEqualTo: currentUser.uid)
+            .where('offerId', isEqualTo: 'current_offer')
+            .where('isActive', isEqualTo: true)
+            .where('isUsed', isEqualTo: false)
+            .limit(1)
+            .get();
+        
+        if (couponSnapshot.docs.isNotEmpty) {
+          final couponData = couponSnapshot.docs.first.data();
+          final personalCode = couponData['code'] as String;
+          
+          // Delay slightly to let UI build, then show dialog
+          Future.delayed(const Duration(seconds: 2), () {
+            if (Get.context != null) {
+              _showFestivalOfferDialog(offer, personalCode);
+            }
+          });
+        }
       }
     } catch (e) {
       print("Error checking offer: $e");
     }
   }
 
-  void _showFestivalOfferDialog(Map<String, dynamic> offer) {
+  void _showFestivalOfferDialog(Map<String, dynamic> offer, String personalCouponCode) {
     final discountPercent = offer['discount']?.toStringAsFixed(0) ?? '10';
     final title = offer['title'] ?? 'diwali';
     final description = offer['description'] ?? '$discountPercent.0% OFF! Limited Time Offer.';
@@ -144,36 +160,121 @@ class HomeController extends GetxController {
                     ),
                     const SizedBox(height: 24),
                     
-                    // Coupon Code Box
+                    // Coupon Code Box with Copy Button (Highlighted)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3E0),
+                        gradient: LinearGradient(
+                          colors: [
+                            const Color(0xFFFFF3E0),
+                            const Color(0xFFFFE0B2),
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: const Color(0xFFFFA726),
-                          width: 2,
+                          width: 2.5,
                           style: BorderStyle.solid,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFFFFA726).withOpacity(0.3),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: Column(
                         children: [
-                          Text(
-                            'CODE: ',
-                            style: GoogleFonts.poppins(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.grey[700],
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.card_giftcard,
+                                size: 18,
+                                color: Color(0xFFE65100),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'YOUR CODE:',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.grey[800],
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: const Color(0xFFE65100),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: SelectableText(
+                              personalCouponCode,
+                              style: GoogleFonts.poppins(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: const Color(0xFFE65100),
+                                letterSpacing: 2,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
-                          Text(
-                            'PVP${discountPercent}OFF',
-                            style: GoogleFonts.poppins(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: const Color(0xFFE65100),
-                              letterSpacing: 1.2,
+                          const SizedBox(height: 12),
+                          InkWell(
+                            onTap: () {
+                              Clipboard.setData(ClipboardData(text: personalCouponCode));
+                              Get.snackbar(
+                                '✓ Copied!',
+                                'Coupon code copied to clipboard',
+                                snackPosition: SnackPosition.BOTTOM,
+                                backgroundColor: Colors.green,
+                                colorText: Colors.white,
+                                duration: const Duration(seconds: 2),
+                                margin: const EdgeInsets.all(10),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFFFFA726), Color(0xFFFF9800)],
+                                ),
+                                borderRadius: BorderRadius.circular(10),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFFFFA726).withOpacity(0.4),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.copy, size: 16, color: Colors.white),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'COPY CODE',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],

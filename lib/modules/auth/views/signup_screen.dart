@@ -4,13 +4,16 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:pvp_traders/core/constants/app_colors.dart';
 import '../controllers/signup_controller.dart';
 import 'package:pvp_traders/core/constants/app_assets.dart';
+import 'phone_login_screen.dart';
+import 'email_login_screen.dart';
 
 class SignUpScreen extends StatelessWidget {
   const SignUpScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final SignUpController controller = Get.put(SignUpController());
+    // Get or create controller (don't delete on rebuild)
+    final SignUpController controller = Get.put(SignUpController(), tag: 'signup');
 
     return Scaffold(
       backgroundColor: Get.theme.scaffoldBackgroundColor,
@@ -60,97 +63,101 @@ class SignUpScreen extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.displayMedium,
               ),
-              const SizedBox(height: 32),
-
-              _buildTextField("full_name".tr, controller.fullNameController, Icons.person_outline),
-              const SizedBox(height: 16),
-              _buildTextField("email".tr, controller.emailController, Icons.email_outlined),
-              const SizedBox(height: 16),
-              _buildTextField("phone_number".tr, controller.phoneController, Icons.phone_android),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               
-              _buildLabel("password".tr),
-              const SizedBox(height: 8),
-              Obx(() => TextField(
-                controller: controller.passwordController,
-                style: TextStyle(color: Get.theme.textTheme.bodyLarge?.color),
-                obscureText: !controller.isPasswordVisible.value,
-                decoration: _inputDecoration(Icons.lock_outline).copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      controller.isPasswordVisible.value ? Icons.visibility : Icons.visibility_off,
-                      color: Colors.grey,
-                    ),
-                    onPressed: controller.togglePasswordVisibility,
-                  ),
+              // Subtitle
+              Text(
+                "choose_signup_method".tr,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                  fontSize: 14,
+                  color: Colors.grey[600],
                 ),
-              )),
+              ),
               
-              const SizedBox(height: 16),
-              
-              _buildLabel("confirm_password".tr),
-              const SizedBox(height: 8),
-              Obx(() => TextField(
-                controller: controller.confirmPasswordController,
-                style: TextStyle(color: Get.theme.textTheme.bodyLarge?.color),
-                obscureText: !controller.isConfirmPasswordVisible.value,
-                decoration: _inputDecoration(Icons.lock_outline).copyWith(
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      controller.isConfirmPasswordVisible.value ? Icons.visibility : Icons.visibility_off,
-                      color: Colors.grey,
-                    ),
-                    onPressed: controller.toggleConfirmPasswordVisibility,
-                  ),
-                ),
-              )),
-              
-              const SizedBox(height: 16),
-              
-              Obx(() => Row(
-                children: [
-                  Checkbox(
-                    value: controller.agreedToTerms.value,
-                    onChanged: controller.toggleTerms,
-                    activeColor: AppColors.primary,
-                  ),
-                  Text(
-                    "agree_terms".tr,
-                    style: GoogleFonts.poppins(fontSize: 14, color: Get.theme.textTheme.bodyLarge?.color),
-                  ),
-                ],
-              )),
-              
-              const SizedBox(height: 24),
+              const SizedBox(height: 48),
 
+              // Email Signup
               SizedBox(
-                height: 52,
-                child: Obx(() => ElevatedButton(
-                  onPressed: (controller.isLoading.value) ? null : controller.signUp,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () => Get.to(() => const EmailLoginScreen(isSignup: true)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    shadowColor: AppColors.primary.withOpacity(0.4),
+                    elevation: 5,
                   ),
-                  child: controller.isLoading.value 
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(
-                      "create_account".tr,
-                      style: GoogleFonts.poppins(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.email_outlined, size: 24, color: Colors.white),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          "email_signup".tr,
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                )),
+                    ],
+                  ),
+                ),
               ),
 
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
+
+              // Phone Signup
+              SizedBox(
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: () => Get.to(() => const PhoneLoginScreen(isSignup: true)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    shadowColor: AppColors.primary.withOpacity(0.4),
+                    elevation: 5,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.phone_android, size: 24, color: Colors.white),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        child: Text(
+                          "phone_signup".tr,
+                          style: GoogleFonts.poppins(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 48),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text("already_account".tr, style: GoogleFonts.poppins(color: const Color(0xFF666666))),
+                  Flexible(
+                    child: Text(
+                      "already_account".tr,
+                      style: GoogleFonts.poppins(color: const Color(0xFF666666)),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                   TextButton(
                     onPressed: controller.goToLogin,
                     child: Text(
@@ -165,52 +172,6 @@ class SignUpScreen extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildTextField(String label, TextEditingController controller, IconData icon) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildLabel(label),
-        const SizedBox(height: 8),
-        TextField(
-          controller: controller,
-          style: TextStyle(color: Get.theme.textTheme.bodyLarge?.color),
-          decoration: _inputDecoration(icon),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLabel(String text) {
-    return Text(
-      text,
-      style: GoogleFonts.poppins(
-        fontSize: 14,
-        color: Color(0xFF666666),
-      ),
-    );
-  }
-
-  InputDecoration _inputDecoration(IconData icon) {
-    return InputDecoration(
-      prefixIcon: Icon(icon, color: Colors.grey),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: Colors.grey[300]!),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: AppColors.primary),
-      ),
-      filled: true,
-      fillColor: Get.theme.cardColor,
-      contentPadding: const EdgeInsets.symmetric(vertical: 16),
     );
   }
 }

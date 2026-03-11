@@ -26,8 +26,8 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Register controllers if not present
     final ProfileController controller = Get.find<ProfileController>();
-    final CustomerOrderController orderController = Get.find<CustomerOrderController>();
-    final WishlistController wishlistController = Get.find<WishlistController>();
+    final CustomerOrderController orderController = Get.put(CustomerOrderController(), permanent: true);
+    final WishlistController wishlistController = Get.put(WishlistController(), permanent: true);
     final LoginController loginController = Get.find<LoginController>();
     
     final user = FirebaseAuth.instance.currentUser;

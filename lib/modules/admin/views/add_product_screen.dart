@@ -86,7 +86,38 @@ class AddProductScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Row(
               children: [
-                Expanded(child: _buildTextField("Buying Price (₹)", "Cost price", controller.buyingPriceController, isNumber: true)),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text("Buying Price (₹)", style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: const Color(0xFF6B7280))),
+                          const SizedBox(width: 4),
+                          Icon(Icons.info_outline, size: 14, color: AppColors.primary),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text("Required for profit calculation", style: GoogleFonts.poppins(fontSize: 9, color: AppColors.primary, fontStyle: FontStyle.italic)),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.primary.withOpacity(0.3))),
+                        child: TextField(
+                          controller: controller.buyingPriceController,
+                          style: TextStyle(color: Get.theme.textTheme.bodyLarge?.color),
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            hintText: "Cost price",
+                            hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
+                            border: InputBorder.none,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(width: 16),
                 Expanded(child: _buildTextField("Stock Quantity", "45", controller.stockController, isNumber: true)),
               ],
@@ -119,13 +150,15 @@ class AddProductScreen extends StatelessWidget {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _buildColorChip(Colors.black, "Black", true),
+                  _buildColorChip(Colors.black, "Black", controller),
                   const SizedBox(width: 12),
-                  _buildColorChip(Colors.orange[100]!, "Beige", false),
+                  _buildColorChip(Colors.orange[100]!, "Beige", controller),
                   const SizedBox(width: 12),
-                  _buildColorChip(Colors.blue[900]!, "Navy", false),
+                  _buildColorChip(Colors.blue[900]!, "Navy", controller),
                   const SizedBox(width: 12),
-                  _buildAddColorButton(),
+                  _buildColorChip(Colors.red, "Red", controller),
+                  const SizedBox(width: 12),
+                  _buildColorChip(Colors.white, "White", controller),
                 ],
               ),
             ),
@@ -257,25 +290,39 @@ class AddProductScreen extends StatelessWidget {
     });
   }
 
-  Widget _buildColorChip(Color color, String label, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
-      decoration: BoxDecoration(
-        color: Get.theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        border: isSelected ? Border.all(color: AppColors.primary.withOpacity(0.3)) : null,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32, height: 32,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+  Widget _buildColorChip(Color color, String label, AdminProductController controller) {
+    return Obx(() {
+      final isSelected = controller.selectedColors.contains(label);
+      return GestureDetector(
+        onTap: () => controller.toggleColor(label),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(4, 4, 12, 4),
+          decoration: BoxDecoration(
+            color: Get.theme.cardColor,
+            borderRadius: BorderRadius.circular(20),
+            border: isSelected ? Border.all(color: AppColors.primary, width: 2) : Border.all(color: Colors.grey[300]!),
           ),
-          const SizedBox(width: 8),
-          Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Get.theme.textTheme.bodyLarge?.color)),
-        ],
-      ),
-    );
+          child: Row(
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: label == "White" ? Border.all(color: Colors.grey[300]!) : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(label, style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.bold, color: Get.theme.textTheme.bodyLarge?.color)),
+              if (isSelected) ...[
+                const SizedBox(width: 4),
+                Icon(Icons.check_circle, color: AppColors.primary, size: 16),
+              ],
+            ],
+          ),
+        ),
+      );
+    });
   }
 
   Widget _buildAddColorButton() {

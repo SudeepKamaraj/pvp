@@ -8,6 +8,13 @@ import '../../../../data/models/order_model.dart';
 class AdminOrderManagementScreen extends StatelessWidget {
   const AdminOrderManagementScreen({super.key});
 
+  String _translate(String text) {
+    if (text.isEmpty) return text;
+    String cleanText = text.trim().toLowerCase();
+    String translated = cleanText.tr;
+    return (translated == cleanText) ? text : translated;
+  }
+
   @override
   Widget build(BuildContext context) {
     final AdminOrderController controller = Get.find<AdminOrderController>();
@@ -42,10 +49,14 @@ class AdminOrderManagementScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          order.id,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        Flexible(
+                          child: Text(
+                            order.id,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
+                        const SizedBox(width: 8),
                         Text(
                           DateFormat('dd MMM yyyy').format(order.date),
                           style: const TextStyle(color: Colors.grey, fontSize: 12),
@@ -58,7 +69,13 @@ class AdminOrderManagementScreen extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text("${item.quantity}x ${item.product.name}"),
+                          Flexible(
+                            child: Text(
+                              "${item.quantity}x ${_translate(item.product.name)}",
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text("Size: ${item.selectedSize}"),
                         ],
                       ),
@@ -78,13 +95,17 @@ class AdminOrderManagementScreen extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          "Status: ${order.status}",
-                          style: TextStyle(
-                            color: _getStatusColor(order.status),
-                            fontWeight: FontWeight.bold,
+                        Flexible(
+                          child: Text(
+                            "Status: ${order.status}",
+                            style: TextStyle(
+                              color: _getStatusColor(order.status),
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        const SizedBox(width: 8),
                         PopupMenuButton<String>(
                           onSelected: (value) => controller.updateOrderStatus(order, value),
                           itemBuilder: (context) => [
@@ -99,7 +120,11 @@ class AdminOrderManagementScreen extends StatelessWidget {
                               color: Get.theme.scaffoldBackgroundColor,
                               borderRadius: BorderRadius.circular(20),
                             ),
-                            child: Text("Update Status", style: TextStyle(color: Get.theme.textTheme.bodyLarge?.color)),
+                            child: Text(
+                              "Update Status",
+                              style: TextStyle(color: Get.theme.textTheme.bodyLarge?.color),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ),
                       ],

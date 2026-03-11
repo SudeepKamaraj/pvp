@@ -341,60 +341,154 @@ class AdminDashboardScreen extends StatelessWidget {
   }
 
   void _showCreateOfferDialog(BuildContext context) {
+    final controller = Get.find<AdminDashboardController>();
     final titleController = TextEditingController();
     final discountController = TextEditingController();
     
-    Get.defaultDialog(
-      title: "Create New Offer",
-      titleStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold),
-      contentPadding: const EdgeInsets.all(20),
-      content: SingleChildScrollView(
-        child: Column(
-          children: [
-            TextField(
-              controller: titleController,
-              decoration: InputDecoration(
-                labelText: "Offer Title (e.g. MEGA50)",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    // Fetch current offer first
+    controller.getCurrentOffer().then((currentOffer) {
+      Get.defaultDialog(
+        title: "Manage Offer",
+        titleStyle: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+        contentPadding: const EdgeInsets.all(20),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Show current offer if exists
+              if (currentOffer != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.local_offer, color: AppColors.primary, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            "Current Offer",
+                            style: GoogleFonts.poppins(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        currentOffer['title'] ?? '',
+                        style: GoogleFonts.poppins(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${currentOffer['discount']}% OFF',
+                        style: GoogleFonts.poppins(
+                          color: Colors.green,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            Get.back();
+                            Get.defaultDialog(
+                              title: "Delete Offer?",
+                              middleText: "Are you sure you want to delete the current offer?",
+                              textConfirm: "DELETE",
+                              textCancel: "CANCEL",
+                              confirmTextColor: Colors.white,
+                              buttonColor: Colors.red,
+                              onConfirm: () async {
+                                Get.back();
+                                await controller.deleteOffer();
+                              },
+                            );
+                          },
+                          icon: const Icon(Icons.delete, color: Colors.red, size: 18),
+                          label: Text(
+                            "Delete Offer",
+                            style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.bold),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Colors.red),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Divider(),
+                const SizedBox(height: 16),
+              ],
+              
+              Text(
+                currentOffer != null ? "Create New Offer (Replaces Current)" : "Create New Offer",
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                  color: Colors.grey[700],
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: discountController,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: "Discount Percentage",
-                suffixText: "%",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleController,
+                decoration: InputDecoration(
+                  labelText: "Offer Title (e.g. MEGA50)",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: discountController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: "Discount Percentage",
+                  suffixText: "%",
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
-      textConfirm: "CREATE",
-      confirmTextColor: Colors.white,
-      buttonColor: AppColors.primary,
-      onConfirm: () {
-        if (titleController.text.isEmpty || discountController.text.isEmpty) {
-          Get.snackbar("Error", "Please fill all fields", backgroundColor: Colors.red, colorText: Colors.white);
-          return;
-        }
+        textConfirm: "CREATE",
+        confirmTextColor: Colors.white,
+        buttonColor: AppColors.primary,
+        onConfirm: () {
+          if (titleController.text.isEmpty || discountController.text.isEmpty) {
+            Get.snackbar("Error", "Please fill all fields", backgroundColor: Colors.red, colorText: Colors.white);
+            return;
+          }
 
-        double? discount = double.tryParse(discountController.text);
-        if (discount == null) {
-          Get.snackbar("Error", "Invalid discount percentage", backgroundColor: Colors.red, colorText: Colors.white);
-          return;
-        }
+          double? discount = double.tryParse(discountController.text);
+          if (discount == null) {
+            Get.snackbar("Error", "Invalid discount percentage", backgroundColor: Colors.red, colorText: Colors.white);
+            return;
+          }
 
-        Get.back();
-        
-        String title = titleController.text.trim();
-        String desc = "$discount% OFF! Limited Time Offer.";
+          Get.back();
+          
+          String title = titleController.text.trim();
+          String desc = "$discount% OFF! Limited Time Offer.";
 
-        Get.find<AdminDashboardController>().createOffer(title, desc, discount);
-      },
-      textCancel: "CANCEL",
-    );
+          controller.createOffer(title, desc, discount);
+        },
+        textCancel: "CANCEL",
+      );
+    });
   }
 
   void _showProfitAnalysis(BuildContext context, AdminDashboardController controller) async {
@@ -480,7 +574,46 @@ class AdminDashboardScreen extends StatelessWidget {
               // Top Products List
               Expanded(
                 child: (profitData['topProducts'] as List).isEmpty
-                    ? Center(child: Text("No profit data available.\nAdd buying prices to products.", style: GoogleFonts.poppins(color: Colors.grey), textAlign: TextAlign.center))
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.info_outline, size: 48, color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                              "No Profit Data Available",
+                              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              profitData['deliveredOrders'] == 0
+                                  ? "No delivered orders yet.\nProfit is calculated from delivered orders."
+                                  : profitData['productsWithBuyingPrice'] == 0
+                                      ? "Add buying prices to your products\nin the 'Add Product' screen."
+                                      : "Products sold don't have buying prices set.",
+                              style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text("📊 Debug Info:", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 12)),
+                                  const SizedBox(height: 4),
+                                  Text("• Delivered Orders: ${profitData['deliveredOrders']}", style: GoogleFonts.poppins(fontSize: 11)),
+                                  Text("• Products with Buying Price: ${profitData['productsWithBuyingPrice']}", style: GoogleFonts.poppins(fontSize: 11)),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
                     : ListView.builder(
                         shrinkWrap: true,
                         itemCount: (profitData['topProducts'] as List).length,

@@ -35,6 +35,7 @@ class AdminProductController extends GetxController {
   var selectedProductId = "".obs;
   var selectedCategory = "Men".obs;
   var selectedSizes = <String>[].obs;
+  var selectedColors = <String>[].obs;
   var uploadedImages = <String>[].obs;
   var uploadedVideos = <String>[].obs;
 
@@ -43,6 +44,14 @@ class AdminProductController extends GetxController {
       selectedSizes.remove(size);
     } else {
       selectedSizes.add(size);
+    }
+  }
+
+  void toggleColor(String color) {
+    if (selectedColors.contains(color)) {
+      selectedColors.remove(color);
+    } else {
+      selectedColors.add(color);
     }
   }
 
@@ -144,6 +153,7 @@ class AdminProductController extends GetxController {
     offerPriceController.text = product.offerPrice?.toString() ?? "";
     stockController.text = product.stockQuantity.toString();
     selectedSizes.value = List<String>.from(product.sizes);
+    selectedColors.value = List<String>.from(product.colors);
     uploadedImages.value = product.images.where((img) => img.startsWith('data:image')).toList();
     if (uploadedImages.isEmpty && product.imageUrl.isNotEmpty) {
         uploadedImages.add(product.imageUrl);
@@ -166,8 +176,32 @@ class AdminProductController extends GetxController {
       return;
     }
 
+    // Warn if buying price is not set
+    if (buyingPriceController.text.isEmpty) {
+      final shouldContinue = await Get.dialog<bool>(
+        AlertDialog(
+          title: const Text("Missing Buying Price"),
+          content: const Text("You haven't set a buying price for this product. This means profit analysis won't include this product.\n\nDo you want to continue without setting a buying price?"),
+          actions: [
+            TextButton(
+              onPressed: () => Get.back(result: false),
+              child: const Text("CANCEL"),
+            ),
+            TextButton(
+              onPressed: () => Get.back(result: true),
+              child: const Text("CONTINUE ANYWAY"),
+            ),
+          ],
+        ),
+      ) ?? false;
+      
+      if (!shouldContinue) return;
+    }
+
     isLoading.value = true;
     try {
+      print("DEBUG: Saving product with buying price: ${buyingPriceController.text}");
+      
       final product = ProductModel(
         id: isEditing.value ? selectedProductId.value : '', // Empty ID for new, will be ignored by addProduct?
         name: nameController.text,
@@ -179,9 +213,13 @@ class AdminProductController extends GetxController {
         offerPrice: double.tryParse(offerPriceController.text),
         stockQuantity: int.tryParse(stockController.text) ?? 0,
         sizes: selectedSizes.toList(),
+        colors: selectedColors.toList(),
         images: uploadedImages.toList(),
         videos: uploadedVideos.toList(),
       );
+      
+      print("DEBUG: Product model created with buyingPrice: ${product.buyingPrice}");
+      print("DEBUG: Product toFirestore: ${product.toFirestore()}");
 
       if (isEditing.value) {
         await _databaseService.updateProduct(product);
@@ -221,7 +259,7 @@ class AdminProductController extends GetxController {
     offerPriceController.clear();
     stockController.clear();
     selectedSizes.clear();
-    selectedSizes.clear();
+    selectedColors.clear();
     uploadedImages.clear();
     uploadedVideos.clear();
     selectedCategory.value = "Men";

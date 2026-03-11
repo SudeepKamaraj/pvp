@@ -101,10 +101,14 @@ class AdminOrdersScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                "TODAY, ${DateFormat('hh:mm a').format(order.date)}", 
-                style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)
+              Flexible(
+                child: Text(
+                  "TODAY, ${DateFormat('hh:mm a').format(order.date)}", 
+                  style: GoogleFonts.poppins(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(color: Colors.red[50], borderRadius: BorderRadius.circular(8)),
@@ -113,7 +117,11 @@ class AdminOrdersScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text("#${order.id.substring(0, 8).toUpperCase()}", style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red)),
+          Text(
+            "#${order.id.substring(0, 8).toUpperCase()}",
+            style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red),
+            overflow: TextOverflow.ellipsis,
+          ),
           const SizedBox(height: 16),
           
           Row(
@@ -123,12 +131,22 @@ class AdminOrdersScreen extends StatelessWidget {
                 backgroundImage: NetworkImage('https://i.pravatar.cc/150'), // Placeholder
               ),
               const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Customer Name", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)), // Need to fetch user name
-                  Text("${order.items.length} Items • ₹${order.totalAmount.toStringAsFixed(0)}", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 14)),
-                ],
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Customer Name",
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      "${order.items.length} Items • ₹${order.totalAmount.toStringAsFixed(0)}",
+                      style: GoogleFonts.poppins(color: Colors.grey, fontSize: 14),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               )
             ],
           ),
@@ -136,15 +154,24 @@ class AdminOrdersScreen extends StatelessWidget {
           
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12)),
-                child: Row(
-                  children: [
-                    Text("Status: ${order.status}", style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.grey),
-                  ],
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          "Status: ${order.status}",
+                          style: GoogleFonts.poppins(fontWeight: FontWeight.bold),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.keyboard_arrow_down, size: 16, color: Colors.grey),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -156,7 +183,11 @@ class AdminOrdersScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  child: Text("PROCESS NOW", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white)),
+                  child: Text(
+                    "PROCESS NOW",
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.white),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               )
             ],

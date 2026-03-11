@@ -276,6 +276,114 @@ class DatabaseService {
     return null;
   }
 
+  Future<void> deleteOffer() async {
+    await _db.collection('offers').doc('current_offer').delete();
+  }
+
+  // Coupon validation and retrieval with user-specific one-time use check
+  Future<Map<String, dynamic>?> validateCoupon(String code, String userId) async {
+    try {
+      print('🔍 Validating coupon code: $code for user: $userId');
+      print('🔍 Uppercased code: ${code.toUpperCase()}');
+      
+      // Check if coupon exists, is active, and NOT used (query level filtering)
+      final snapshot = await _db.collection('coupons')
+          .where('code', isEqualTo: code.toUpperCase())
+          .where('isActive', isEqualTo: true)
+          .where('isUsed', isEqualTo: false)
+          .limit(1)
+          .get(const GetOptions(source: Source.server)); // Force server read to avoid cache
+      
+      print('🔍 Query completed. Docs found: ${snapshot.docs.length}');
+      
+      if (snapshot.docs.isEmpty) {
+        // Check if coupon exists but is used
+        final usedCheck = await _db.collection('coupons')
+            .where('code', isEqualTo: code.toUpperCase())
+            .limit(1)
+            .get(const GetOptions(source: Source.server));
+        
+        if (usedCheck.docs.isNotEmpty) {
+          final data = usedCheck.docs.first.data();
+          if (data['isUsed'] == true) {
+            print('❌ Coupon has already been used');
+            return {'error': 'already_used', 'message': 'This coupon code has already been used'};
+          } else if (data['isActive'] != true) {
+            print('❌ Coupon is not active');
+            return null;
+          }
+        }
+        
+        print('❌ No matching coupon found');
+        return null;
+      }
+      
+      final couponData = snapshot.docs.first.data();
+      print('✅ Coupon found: $couponData');
+      
+      // Check if coupon belongs to this user (for personalized coupons)
+      final couponUserId = couponData['userId'];
+      if (couponUserId != null && couponUserId != userId) {
+        print('❌ Coupon does not belong to this user');
+        return {'error': 'invalid', 'message': 'This coupon code is not valid for your account'};
+      }
+      
+      print('✅ Coupon is valid and unused');
+      return couponData;
+    } catch (e) {
+      print('❌ Error validating coupon: $e');
+      return null;
+    }
+  }
+
+  // Mark coupon as used (both in coupon_usage collection and mark coupon as used)
+  Future<void> markCouponAsUsed(String couponCode, String userId, String orderId) async {
+    try {
+      // Add usage record
+      await _db.collection('coupon_usage').add({
+        'userId': userId,
+        'couponCode': couponCode.toUpperCase(),
+        'orderId': orderId,
+        'usedAt': FieldValue.serverTimestamp(),
+      });
+      
+      // Mark the coupon as used in the coupons collection
+      final couponSnapshot = await _db.collection('coupons')
+          .where('code', isEqualTo: couponCode.toUpperCase())
+          .limit(1)
+          .get();
+      
+      if (couponSnapshot.docs.isNotEmpty) {
+        await couponSnapshot.docs.first.reference.update({
+          'isUsed': true,
+          'usedBy': userId,
+          'usedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      
+      print('✅ Coupon marked as used: $couponCode by user: $userId');
+    } catch (e) {
+      print('❌ Error marking coupon as used: $e');
+      throw e;
+    }
+  }
+
+  // Check if user has used a specific coupon
+  Future<bool> hasUserUsedCoupon(String couponCode, String userId) async {
+    try {
+      final snapshot = await _db.collection('coupon_usage')
+          .where('userId', isEqualTo: userId)
+          .where('couponCode', isEqualTo: couponCode.toUpperCase())
+          .limit(1)
+          .get();
+      
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      print('❌ Error checking coupon usage: $e');
+      return false;
+    }
+  }
+
   // Reviews
   Future<void> addReview(ReviewModel review) async {
     final reviewRef = _db.collection('products').doc(review.productId).collection('reviews').doc(review.id);
@@ -340,13 +448,15 @@ class DatabaseService {
     String type = 'general',
     Map<String, dynamic>? data,
   }) async {
+    final now = Timestamp.now();
     await _db.collection('notifications').add({
       'userId': userId,
       'title': title,
       'body': body,
       'type': type,
       'isRead': false,
-      'timestamp': FieldValue.serverTimestamp(),
+      'timestamp': now,
+      'createdAt': FieldValue.serverTimestamp(),
       'data': data ?? {},
     });
   }
@@ -359,6 +469,9 @@ class DatabaseService {
     // Get all users
     final usersSnapshot = await _db.collection('users').get();
     
+    // Use current timestamp to avoid null values in orderBy
+    final now = Timestamp.now();
+    
     // Create notification for each user
     final batch = _db.batch();
     for (var userDoc in usersSnapshot.docs) {
@@ -369,7 +482,8 @@ class DatabaseService {
         'body': body,
         'type': type,
         'isRead': false,
-        'timestamp': FieldValue.serverTimestamp(),
+        'timestamp': now,
+        'createdAt': FieldValue.serverTimestamp(), // Keep server timestamp for accuracy
       });
     }
     

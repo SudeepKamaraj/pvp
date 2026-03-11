@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -71,6 +72,50 @@ class NotificationsScreen extends StatelessWidget {
                   .limit(50)
                   .snapshots(),
               builder: (context, snapshot) {
+                // Handle errors
+                if (snapshot.hasError) {
+                  print('Firestore error: ${snapshot.error}');
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 80,
+                          color: Colors.red[300],
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Error loading notifications',
+                          style: GoogleFonts.poppins(
+                            fontSize: 16,
+                            color: Colors.grey,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Please try again later',
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Colors.grey[400],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => Get.back(),
+                          icon: const Icon(Icons.refresh, size: 18),
+                          label: const Text('Go Back'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -114,10 +159,15 @@ class NotificationsScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final notification = notifications[index].data() as Map<String, dynamic>;
                     final isRead = notification['isRead'] ?? false;
-                    final timestamp = (notification['timestamp'] as Timestamp?)?.toDate();
+                    // Handle both timestamp and createdAt, fallback to now if null
+                    final timestamp = (notification['timestamp'] as Timestamp?)?.toDate() ?? 
+                                     (notification['createdAt'] as Timestamp?)?.toDate() ??
+                                     DateTime.now();
                     final title = notification['title'] ?? 'Notification';
                     final body = notification['body'] ?? '';
                     final type = notification['type'] ?? 'general';
+                    final data = notification['data'] as Map<String, dynamic>?;
+                    final couponCode = data?['couponCode'] as String?;
 
                     return Container(
                       margin: const EdgeInsets.only(bottom: 16),
@@ -232,25 +282,116 @@ class NotificationsScreen extends StatelessWidget {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ],
-                                      if (timestamp != null) ...[
-                                        const SizedBox(height: 8),
-                                        Row(
-                                          children: [
-                                            Icon(
-                                              Icons.access_time,
-                                              size: 12,
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Icon(
+                                            Icons.access_time,
+                                            size: 12,
+                                            color: Colors.grey[600],
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _formatTimestamp(timestamp),
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 11,
                                               color: Colors.grey[600],
+                                              fontWeight: FontWeight.w500,
                                             ),
-                                            const SizedBox(width: 4),
-                                            Text(
-                                              _formatTimestamp(timestamp),
-                                              style: GoogleFonts.poppins(
-                                                fontSize: 11,
-                                                color: Colors.grey[600],
-                                                fontWeight: FontWeight.w500,
+                                          ),
+                                        ],
+                                      ),
+                                      // Display coupon code if available
+                                      if (couponCode != null && couponCode.isNotEmpty) ...[
+                                        const SizedBox(height: 12),
+                                        Container(
+                                          padding: const EdgeInsets.all(12),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFFFF3E0),
+                                            borderRadius: BorderRadius.circular(10),
+                                            border: Border.all(
+                                              color: const Color(0xFFFFA726),
+                                              width: 1.5,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  const Icon(
+                                                    Icons.local_offer,
+                                                    size: 16,
+                                                    color: Color(0xFFE65100),
+                                                  ),
+                                                  const SizedBox(width: 6),
+                                                  Text(
+                                                    'Your Coupon Code:',
+                                                    style: GoogleFonts.poppins(
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: Colors.grey[700],
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                            ),
-                                          ],
+                                              const SizedBox(height: 8),
+                                              Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: SelectableText(
+                                                      couponCode,
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.bold,
+                                                        color: const Color(0xFFE65100),
+                                                        letterSpacing: 1.2,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Material(
+                                                    color: const Color(0xFFFFA726),
+                                                    borderRadius: BorderRadius.circular(8),
+                                                    child: InkWell(
+                                                      borderRadius: BorderRadius.circular(8),
+                                                      onTap: () {
+                                                        Clipboard.setData(ClipboardData(text: couponCode));
+                                                        Get.snackbar(
+                                                          '✓ Copied!',
+                                                          'Coupon code copied to clipboard',
+                                                          snackPosition: SnackPosition.BOTTOM,
+                                                          backgroundColor: Colors.green,
+                                                          colorText: Colors.white,
+                                                          duration: const Duration(seconds: 2),
+                                                          margin: const EdgeInsets.all(10),
+                                                        );
+                                                      },
+                                                      child: Padding(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                        child: Row(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            const Icon(Icons.copy, size: 14, color: Colors.white),
+                                                            const SizedBox(width: 4),
+                                                            Text(
+                                                              'COPY',
+                                                              style: GoogleFonts.poppins(
+                                                                fontSize: 10,
+                                                                fontWeight: FontWeight.bold,
+                                                                color: Colors.white,
+                                                                letterSpacing: 0.5,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ],
@@ -266,32 +407,6 @@ class NotificationsScreen extends StatelessWidget {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          if (currentUser != null) {
-            // Create a test notification
-            await FirebaseFirestore.instance.collection('notifications').add({
-              'userId': currentUser.uid,
-              'title': 'Welcome to PVP Traders! 🎉',
-              'body': 'Thank you for shopping with us. Check out our latest offers and deals!',
-              'type': 'offer',
-              'isRead': false,
-              'timestamp': Timestamp.now(),
-            });
-            
-            Get.snackbar(
-              'Success',
-              'Test notification created!',
-              backgroundColor: Colors.green,
-              colorText: Colors.white,
-              snackPosition: SnackPosition.BOTTOM,
-            );
-          }
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('Test Notification'),
-        backgroundColor: Colors.red,
-      ),
     );
   }
 

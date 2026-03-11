@@ -1,11 +1,20 @@
 rules_version = '2';
+// Updated: 2026-03-03 - Email OTP Authentication Fixed
 service cloud.firestore {
   match /databases/{database}/documents {
     
+    // Email OTPs collection - UNRESTRICTED ACCESS for unauthenticated users
+    // This allows users to login/signup via email OTP before authentication
+    match /email_otps/{emailDoc} {
+      allow read, write: if true;
+    }
+    
     // Users collection
     match /users/{userId} {
-      allow read: if request.auth != null;
+      // Allow reading for email existence check during OTP login
+      allow read: if true;
       allow write: if request.auth != null && request.auth.uid == userId;
+      allow create: if true; // Allow user creation during signup
     }
     
     // Products collection

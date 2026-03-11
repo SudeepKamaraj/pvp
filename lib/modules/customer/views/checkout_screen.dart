@@ -26,9 +26,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   final _zipController = TextEditingController();
   final _stateController = TextEditingController(); // Added state controller
   final _phoneController = TextEditingController();
+  final _couponController = TextEditingController(); // Coupon code input
   int _selectedPaymentMethod = 0; // 0: COD, 1: Online
   Map<String, dynamic>? _selectedSavedAddress;
   bool _isPlacingOrder = false;
+  
+  // Coupon variables
+  double _discountPercentage = 0.0;
+  bool _isCouponApplied = false;
+  String _appliedCouponCode = '';
+  bool _isValidatingCoupon = false;
   
   final RazorpayService _razorpayService = RazorpayService();
   String? _pendingOrderId;
@@ -51,6 +58,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     _zipController.dispose();
     _stateController.dispose();
     _phoneController.dispose();
+    _couponController.dispose();
     super.dispose();
   }
 
@@ -246,6 +254,84 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               
               const SizedBox(height: 24),
+              
+              // Coupon Code Section
+              Text("Have a Coupon Code?", style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _couponController,
+                      enabled: !_isCouponApplied,
+                      decoration: InputDecoration(
+                        hintText: "Enter coupon code",
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        prefixIcon: const Icon(Icons.local_offer),
+                        filled: true,
+                        fillColor: _isCouponApplied ? Colors.green.withOpacity(0.1) : null,
+                        suffixIcon: _isCouponApplied 
+                          ? IconButton(
+                              icon: const Icon(Icons.close, color: Colors.red),
+                              onPressed: () {
+                                setState(() {
+                                  _isCouponApplied = false;
+                                  _discountPercentage = 0.0;
+                                  _appliedCouponCode = '';
+                                  _couponController.clear();
+                                });
+                              },
+                            )
+                          : null,
+                      ),
+                      textCapitalization: TextCapitalization.characters,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _isCouponApplied || _isValidatingCoupon ? null : _validateAndApplyCoupon,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isValidatingCoupon
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(
+                          _isCouponApplied ? "APPLIED" : "APPLY",
+                          style: GoogleFonts.poppins(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                  ),
+                ],
+              ),
+              
+              if (_isCouponApplied)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle, color: Colors.green, size: 16),
+                      const SizedBox(width: 6),
+                      Text(
+                        "$_appliedCouponCode applied - ${_discountPercentage.toStringAsFixed(0)}% OFF",
+                        style: GoogleFonts.poppins(
+                          color: Colors.green,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
+              const SizedBox(height: 24),
               Text("order_summary".tr, style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               Container(
@@ -272,12 +358,28 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         const Text("₹40", style: TextStyle(color: Colors.green)),
                       ],
                     ),
+                    if (_isCouponApplied) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text("Discount ($_appliedCouponCode)", style: const TextStyle(color: Colors.green)),
+                          Text(
+                            "-₹${((cartController.totalAmount + 40) * _discountPercentage / 100).toStringAsFixed(0)}",
+                            style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ],
                     const Divider(height: 24),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text("total".tr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                        Text("₹${(cartController.totalAmount + 40).toStringAsFixed(0)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.primary)),
+                        Text(
+                          "₹${_calculateFinalTotal(cartController.totalAmount).toStringAsFixed(0)}", 
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.primary)
+                        ),
                       ],
                     ),
                   ],
@@ -335,6 +437,96 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         ),
       ),
     );
+  }
+
+  // Calculate final total with discount
+  double _calculateFinalTotal(double cartTotal) {
+    double total = cartTotal + 40; // Add delivery fee
+    if (_isCouponApplied) {
+      double discount = total * _discountPercentage / 100;
+      total -= discount;
+    }
+    return total;
+  }
+
+  // Validate and apply coupon
+  Future<void> _validateAndApplyCoupon() async {
+    if (_couponController.text.trim().isEmpty) {
+      Get.snackbar(
+        "Error",
+        "Please enter a coupon code",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      Get.snackbar(
+        "Error",
+        "Please login to apply coupon",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+      return;
+    }
+
+    setState(() => _isValidatingCoupon = true);
+
+    try {
+      print('📱 Attempting to validate coupon: ${_couponController.text.trim()} for user: ${user.uid}');
+      final couponData = await DatabaseService().validateCoupon(_couponController.text.trim(), user.uid);
+      
+      print('📱 Coupon validation result: $couponData');
+      
+      if (couponData != null) {
+        // Check if it's an error response (already used)
+        if (couponData.containsKey('error') && couponData['error'] == 'already_used') {
+          Get.snackbar(
+            "Already Used",
+            couponData['message'] ?? "You have already used this coupon code",
+            backgroundColor: Colors.orange,
+            colorText: Colors.white,
+            duration: const Duration(seconds: 3),
+          );
+          return;
+        }
+        
+        print('✅ Coupon is valid, applying discount...');
+        setState(() {
+          _isCouponApplied = true;
+          _discountPercentage = (couponData['discount'] ?? 0.0).toDouble();
+          _appliedCouponCode = _couponController.text.trim().toUpperCase();
+        });
+        
+        Get.snackbar(
+          "✓ Coupon Applied!",
+          "${_discountPercentage.toStringAsFixed(0)}% discount applied successfully",
+          backgroundColor: Colors.green,
+          colorText: Colors.white,
+          duration: const Duration(seconds: 2),
+        );
+      } else {
+        print('❌ Coupon validation returned null');
+        Get.snackbar(
+          "Invalid Coupon",
+          "This coupon code is not valid or has expired",
+          backgroundColor: Colors.red,
+          colorText: Colors.white,
+        );
+      }
+    } catch (e) {
+      print('❌ Exception during coupon validation: $e');
+      Get.snackbar(
+        "Error",
+        "Failed to validate coupon: $e",
+        backgroundColor: Colors.red,
+        colorText: Colors.white,
+      );
+    } finally {
+      setState(() => _isValidatingCoupon = false);
+    }
   }
 
   void _showAddAddressDialog(BuildContext context, ShippingAddressController controller) {
@@ -452,11 +644,12 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     setState(() => _isPlacingOrder = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
+      final finalTotal = _calculateFinalTotal(cartController.totalAmount);
       final order = OrderModel(
         id: "ORD-${DateTime.now().millisecondsSinceEpoch}",
         userId: user?.uid,
         items: cartController.cartItems.toList(),
-        totalAmount: cartController.totalAmount + 40,
+        totalAmount: finalTotal,
         status: 'Processing',
         date: DateTime.now(),
         address: _addressController.text,
@@ -468,13 +661,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       await DatabaseService().createOrder(order);
       
+      // Mark coupon as used if applied
+      if (_isCouponApplied && user != null && _appliedCouponCode.isNotEmpty) {
+        try {
+          await DatabaseService().markCouponAsUsed(_appliedCouponCode, user.uid, order.id);
+          print('✅ Coupon marked as used in order');
+          // Clear coupon state after marking as used
+          if (mounted) {
+            setState(() {
+              _isCouponApplied = false;
+              _discountPercentage = 0.0;
+              _appliedCouponCode = '';
+              _couponController.clear();
+            });
+          }
+        } catch (couponError) {
+          debugPrint('Failed to mark coupon as used: $couponError');
+          // Continue even if marking fails
+        }
+      }
+      
       // Create notification
       if (user != null) {
         try {
           await DatabaseService().createNotification(
             userId: user.uid,
             title: 'Order Confirmed! 🎉',
-            body: 'Your order #${order.id.substring(0, 8)} has been placed successfully. Total: ₹${order.totalAmount.toStringAsFixed(0)}',
+            body: 'Your order #${order.id.substring(0, 8)} has been placed successfully. Total: ₹${order.totalAmount.toStringAsFixed(0)}${_isCouponApplied ? " (Discount applied: $_appliedCouponCode)" : ""}',
             type: 'order',
             data: {'orderId': order.id},
           );
@@ -500,7 +713,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       return;
     }
 
-    final totalAmount = cartController.totalAmount + 40;
+    final totalAmount = _calculateFinalTotal(cartController.totalAmount);
     _pendingOrderId = "ORD-${DateTime.now().millisecondsSinceEpoch}";
 
     _razorpayService.openCheckout(
@@ -519,12 +732,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       final cartController = Get.find<CartController>();
+      final finalTotal = _calculateFinalTotal(cartController.totalAmount);
       
       final order = OrderModel(
         id: "ORD-${DateTime.now().millisecondsSinceEpoch}",
         userId: user?.uid,
         items: cartController.cartItems.toList(),
-        totalAmount: cartController.totalAmount + 40,
+        totalAmount: finalTotal,
         status: 'Processing',
         date: DateTime.now(),
         address: _addressController.text,
@@ -539,13 +753,33 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
       await DatabaseService().createOrder(order);
       
+      // Mark coupon as used if applied
+      if (_isCouponApplied && user != null && _appliedCouponCode.isNotEmpty) {
+        try {
+          await DatabaseService().markCouponAsUsed(_appliedCouponCode, user.uid, order.id);
+          print('✅ Coupon marked as used in payment order');
+          // Clear coupon state after marking as used
+          if (mounted) {
+            setState(() {
+              _isCouponApplied = false;
+              _discountPercentage = 0.0;
+              _appliedCouponCode = '';
+              _couponController.clear();
+            });
+          }
+        } catch (couponError) {
+          debugPrint('Failed to mark coupon as used: $couponError');
+          // Continue even if marking fails
+        }
+      }
+      
       // Create notification
       if (user != null) {
         try {
           await DatabaseService().createNotification(
             userId: user.uid,
             title: 'Payment Successful! 🎉',
-            body: 'Your payment of ₹${order.totalAmount.toStringAsFixed(0)} was successful. Order #${order.id.substring(0, 8)}',
+            body: 'Your payment of ₹${order.totalAmount.toStringAsFixed(0)} was successful. Order #${order.id.substring(0, 8)}${_isCouponApplied ? " (Discount: $_appliedCouponCode)" : ""}',
             type: 'order',
             data: {'orderId': order.id},
           );
@@ -558,7 +792,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       
       Get.snackbar(
         "Payment Successful! 🎉",
-        "Order placed successfully",
+        "Order placed successfully${_isCouponApplied ? " with $_appliedCouponCode discount" : ""}",
         backgroundColor: Colors.green,
         colorText: Colors.white,
         duration: const Duration(seconds: 3),

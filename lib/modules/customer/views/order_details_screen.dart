@@ -84,8 +84,21 @@ class OrderDetailsScreen extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("in_transit".tr, style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2)),
-                      Text("${'est_arrival'.tr} : Oct 24", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+                      Flexible(
+                        child: Text(
+                          "in_transit".tr,
+                          style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12, letterSpacing: 1.2),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Flexible(
+                        child: Text(
+                          "${'est_arrival'.tr} : Oct 24",
+                          style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -120,7 +133,13 @@ class OrderDetailsScreen extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text("${'tracking'.tr}: ${order.trackingId ?? 'PVP99120023'}", style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold)),
+                    Flexible(
+                      child: Text(
+                        "${'tracking'.tr}: ${order.trackingId ?? 'PVP99120023'}",
+                        style: GoogleFonts.poppins(fontSize: 11, fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
                     const SizedBox(width: 8),
                     const Icon(Icons.copy, size: 12, color: Colors.red),
                   ],
@@ -147,10 +166,21 @@ class OrderDetailsScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("items_in_order".trParams({'count': order.items.length.toString()}), style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18)),
+                Flexible(
+                  child: Text(
+                    "items_in_order".trParams({'count': order.items.length.toString()}),
+                    style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 18),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => _showReceiptDialog(context),
-                  child: Text("view_receipt".tr, style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13))
+                  child: Text(
+                    "view_receipt".tr,
+                    style: GoogleFonts.poppins(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -186,9 +216,20 @@ class OrderDetailsScreen extends StatelessWidget {
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
                                   Flexible(
-                                    child: Text("\$${item.product.price.toStringAsFixed(2)}", style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16)),
+                                    child: Text(
+                                      "\$${item.product.price.toStringAsFixed(2)}",
+                                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                  Text("${'qty_label'.tr}: ${item.quantity}", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+                                  const SizedBox(width: 8),
+                                  Flexible(
+                                    child: Text(
+                                      "${'qty_label'.tr}: ${item.quantity}",
+                                      style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
                                 ],
                               ),
                               if (order.status == 'Delivered') ...[
@@ -435,8 +476,21 @@ class OrderDetailsScreen extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: GoogleFonts.poppins(color: isTotal ? Colors.black : Colors.grey, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, fontSize: 13)),
-          Text(value, style: GoogleFonts.poppins(color: isTotal ? Colors.red : (isGreen ? Colors.green : Colors.black), fontWeight: FontWeight.bold, fontSize: isTotal ? 18 : 13)),
+          Flexible(
+            child: Text(
+              label,
+              style: GoogleFonts.poppins(color: isTotal ? Colors.black : Colors.grey, fontWeight: isTotal ? FontWeight.bold : FontWeight.normal, fontSize: 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: GoogleFonts.poppins(color: isTotal ? Colors.red : (isGreen ? Colors.green : Colors.black), fontWeight: FontWeight.bold, fontSize: isTotal ? 18 : 13),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

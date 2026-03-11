@@ -9,6 +9,13 @@ import 'add_product_screen.dart';
 class AdminProductManagementScreen extends StatelessWidget {
   const AdminProductManagementScreen({super.key});
 
+  String _translate(String text) {
+    if (text.isEmpty) return text;
+    String cleanText = text.trim().toLowerCase();
+    String translated = cleanText.tr;
+    return (translated == cleanText) ? text : translated;
+  }
+
   @override
   Widget build(BuildContext context) {
     final AdminProductController controller = Get.find<AdminProductController>();
@@ -104,8 +111,8 @@ class AdminProductManagementScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(product.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14, color: Get.theme.textTheme.displayLarge?.color)),
-                              Text("${product.category} • ₹${product.price.toStringAsFixed(0)}", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
+                              Text(_translate(product.name), style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14, color: Get.theme.textTheme.displayLarge?.color)),
+                              Text("${_translate(product.category)} • ₹${product.price.toStringAsFixed(0)}", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 12)),
                               const SizedBox(height: 8),
                               Row(
                                 children: [

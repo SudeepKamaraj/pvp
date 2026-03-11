@@ -11,6 +11,13 @@ class AdminOrderDetailsScreen extends StatelessWidget {
   final OrderModel order;
   const AdminOrderDetailsScreen({super.key, required this.order});
 
+  String _translate(String text) {
+    if (text.isEmpty) return text;
+    String cleanText = text.trim().toLowerCase();
+    String translated = cleanText.tr;
+    return (translated == cleanText) ? text : translated;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -130,7 +137,7 @@ class AdminOrderDetailsScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(item.product.name, style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14)),
+                                Text(_translate(item.product.name), style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 14)),
                                 Text("SIZE: ${item.selectedSize}", style: GoogleFonts.poppins(color: Colors.grey, fontSize: 10, fontWeight: FontWeight.bold)),
                               ],
                             ),

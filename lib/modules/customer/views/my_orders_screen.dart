@@ -183,9 +183,12 @@ class MyOrdersScreen extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Text(
-                            "₹${order.totalAmount.toStringAsFixed(0)}",
-                            style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                          Flexible(
+                            child: Text(
+                              "₹${order.totalAmount.toStringAsFixed(0)}",
+                              style: GoogleFonts.poppins(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.primary),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                         ],
                       ),
