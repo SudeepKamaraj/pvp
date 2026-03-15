@@ -129,6 +129,101 @@ class AdminOrderManagementScreen extends StatelessWidget {
                         ),
                       ],
                     ),
+                    if (order.status == 'Cancellation Requested') ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => controller.approveCancellationRequest(order),
+                              icon: const Icon(Icons.check_circle_outline, size: 16, color: Colors.green),
+                              label: const Text('Approve Cancellation', overflow: TextOverflow.ellipsis),
+                              style: OutlinedButton.styleFrom(foregroundColor: Colors.green),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showRejectionReasonDialog(
+                                title: 'Reject Cancellation',
+                                onSubmit: (reason) => controller.rejectCancellationRequest(order, reason: reason),
+                              ),
+                              icon: const Icon(Icons.cancel_outlined, size: 16, color: Colors.red),
+                              label: const Text('Reject', overflow: TextOverflow.ellipsis),
+                              style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (order.status == 'Return Requested') ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => controller.approveReturnRequest(order),
+                              icon: const Icon(Icons.assignment_turned_in_outlined, size: 16, color: Colors.deepOrange),
+                              label: const Text('Approve Return', overflow: TextOverflow.ellipsis),
+                              style: OutlinedButton.styleFrom(foregroundColor: Colors.deepOrange),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => _showRejectionReasonDialog(
+                                title: 'Reject Return',
+                                onSubmit: (reason) => controller.rejectReturnRequest(order, reason: reason),
+                              ),
+                              icon: const Icon(Icons.highlight_off, size: 16, color: Colors.red),
+                              label: const Text('Reject', overflow: TextOverflow.ellipsis),
+                              style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                    if (order.refundStatus != null &&
+                        (order.refundStatus == 'Initiated' || order.refundStatus == 'Processed')) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.blue[50],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Refund: ${order.refundStatus}',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                if (order.refundStatus == 'Initiated')
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () => controller.advanceRefundStatus(order, 'Processed'),
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                                      child: const Text('Mark Processed', overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ),
+                                if (order.refundStatus == 'Processed')
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: () => controller.advanceRefundStatus(order, 'Completed'),
+                                      style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+                                      child: const Text('Mark Completed', overflow: TextOverflow.ellipsis),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     if (order.status.toLowerCase() == 'cancelled')
                       Align(
@@ -170,7 +265,46 @@ class AdminOrderManagementScreen extends StatelessWidget {
       case 'Shipped': return Colors.blue;
       case 'Delivered': return Colors.green;
       case 'Cancelled': return Colors.red;
+      case 'Cancellation Requested': return Colors.deepOrange;
+      case 'Return Requested': return Colors.orange;
+      case 'Returned': return Colors.purple;
       default: return Get.theme.textTheme.bodyLarge?.color ?? Colors.black;
     }
+  }
+
+  void _showRejectionReasonDialog({
+    required String title,
+    required Future<void> Function(String reason) onSubmit,
+  }) {
+    final reasonController = TextEditingController();
+    Get.dialog(
+      AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: reasonController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Enter rejection reason',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                Get.snackbar('Required', 'Please enter a reason');
+                return;
+              }
+              Get.back();
+              await onSubmit(reason);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -144,7 +144,131 @@ class DatabaseService {
   }
 
   Future<void> updateOrderStatus(String orderId, String newStatus) async {
-    await _db.collection('orders').doc(orderId).update({'status': newStatus});
+    await _db.collection('orders').doc(orderId).update({
+      'status': newStatus,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> requestOrderCancellation({
+    required String orderId,
+    required String userId,
+    required String reason,
+  }) async {
+    await _db.collection('orders').doc(orderId).update({
+      'status': 'Cancellation Requested',
+      'cancelRequest': {
+        'requestedBy': userId,
+        'reason': reason,
+        'requestedAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
+      },
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> requestOrderReturn({
+    required String orderId,
+    required String userId,
+    required String reason,
+    DateTime? pickupDate,
+  }) async {
+    await _db.collection('orders').doc(orderId).update({
+      'status': 'Return Requested',
+      'returnRequest': {
+        'requestedBy': userId,
+        'reason': reason,
+        'pickupDate': pickupDate?.toIso8601String(),
+        'requestedAt': FieldValue.serverTimestamp(),
+        'status': 'pending',
+      },
+      'refundStatus': 'Pending',
+      'refundUpdatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> adminApproveCancellationRequest({
+    required String orderId,
+    required bool requiresRefund,
+  }) async {
+    final updateData = <String, dynamic>{
+      'status': 'Cancelled',
+      'cancelRequest.status': 'approved',
+      'cancelRequest.reviewedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (requiresRefund) {
+      updateData['refundStatus'] = 'Initiated';
+      updateData['refundUpdatedAt'] = FieldValue.serverTimestamp();
+      updateData['refundTimeline.initiatedAt'] = FieldValue.serverTimestamp();
+    } else {
+      updateData['refundStatus'] = 'Not Required';
+      updateData['refundUpdatedAt'] = FieldValue.serverTimestamp();
+    }
+
+    await _db.collection('orders').doc(orderId).update(updateData);
+  }
+
+  Future<void> adminRejectCancellationRequest({
+    required String orderId,
+    required String reason,
+  }) async {
+    await _db.collection('orders').doc(orderId).update({
+      'status': 'Processing',
+      'cancelRequest.status': 'rejected',
+      'cancelRequest.rejectionReason': reason,
+      'cancelRequest.reviewedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> adminApproveReturnRequest({
+    required String orderId,
+  }) async {
+    await _db.collection('orders').doc(orderId).update({
+      'status': 'Returned',
+      'returnRequest.status': 'approved',
+      'returnRequest.reviewedAt': FieldValue.serverTimestamp(),
+      'refundStatus': 'Initiated',
+      'refundUpdatedAt': FieldValue.serverTimestamp(),
+      'refundTimeline.initiatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> adminRejectReturnRequest({
+    required String orderId,
+    required String reason,
+  }) async {
+    await _db.collection('orders').doc(orderId).update({
+      'status': 'Delivered',
+      'returnRequest.status': 'rejected',
+      'returnRequest.rejectionReason': reason,
+      'returnRequest.reviewedAt': FieldValue.serverTimestamp(),
+      'refundStatus': 'Not Applicable',
+      'refundUpdatedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> adminAdvanceRefundStatus({
+    required String orderId,
+    required String nextStatus,
+  }) async {
+    final timelineKey = nextStatus.toLowerCase() == 'processed'
+        ? 'refundTimeline.processedAt'
+        : nextStatus.toLowerCase() == 'completed'
+            ? 'refundTimeline.completedAt'
+            : 'refundTimeline.updatedAt';
+
+    await _db.collection('orders').doc(orderId).update({
+      'refundStatus': nextStatus,
+      'refundUpdatedAt': FieldValue.serverTimestamp(),
+      timelineKey: FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> deleteOrder(String orderId) async {
@@ -181,6 +305,14 @@ class DatabaseService {
       paymentId: data['paymentId'],
       razorpayOrderId: data['razorpayOrderId'],
       razorpaySignature: data['razorpaySignature'],
+      cancellationRequest: data['cancelRequest'] != null
+          ? Map<String, dynamic>.from(data['cancelRequest'])
+          : null,
+      returnRequest: data['returnRequest'] != null
+          ? Map<String, dynamic>.from(data['returnRequest'])
+          : null,
+      refundStatus: data['refundStatus'],
+      refundUpdatedAt: (data['refundUpdatedAt'] as Timestamp?)?.toDate(),
     );
   }
 
