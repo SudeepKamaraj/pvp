@@ -5,6 +5,7 @@ import 'package:get/get.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/constants/app_assets.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../data/models/product_model.dart';
 import '../controllers/home_controller.dart';
 import '../controllers/wishlist_controller.dart';
 import 'product_details_screen.dart';
@@ -166,6 +167,51 @@ class HomeScreen extends StatelessWidget {
             }),
             
             const SizedBox(height: 24),
+
+            // Personalized Recommendations (Hybrid Feed)
+            Obx(() {
+              if (controller.personalizedProducts.isEmpty) {
+                return const SizedBox();
+              }
+
+              final recommended = controller.personalizedProducts.take(10).toList();
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Text(
+                      "Recommended for You",
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 250,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: recommended.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final product = recommended[index];
+                        final reason = controller.recommendationReasons[product.id] ?? 'Picked for you';
+                        return _buildRecommendationCard(
+                          product: product,
+                          reason: reason,
+                          wishlistController: wishlistController,
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              );
+            }),
             
             // Trending
             Padding(
@@ -412,6 +458,118 @@ class HomeScreen extends StatelessWidget {
         ),
       );
       }),
+    );
+  }
+
+  Widget _buildRecommendationCard({
+    required ProductModel product,
+    required String reason,
+    required WishlistController wishlistController,
+  }) {
+    final imageStr = product.imageUrl;
+
+    return GestureDetector(
+      onTap: () => Get.to(() => ProductDetailsScreen(product: product)),
+      child: Container(
+        width: 180,
+        decoration: BoxDecoration(
+          color: Get.theme.cardColor,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                    child: (imageStr.startsWith('data:image'))
+                        ? Image.memory(
+                            base64Decode(imageStr.split(',').last),
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                          )
+                        : (imageStr.isNotEmpty && imageStr.startsWith('http'))
+                            ? Image.network(
+                                imageStr,
+                                width: double.infinity,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                width: double.infinity,
+                                color: Colors.grey[100],
+                                child: const Icon(Icons.image, color: Colors.grey),
+                              ),
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Obx(() {
+                      final isWishlisted = wishlistController.isInWishlist(product);
+                      return GestureDetector(
+                        onTap: () => wishlistController.toggleWishlist(product),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            isWishlisted ? Icons.favorite : Icons.favorite_border,
+                            color: isWishlisted ? Colors.red : Colors.grey,
+                            size: 16,
+                          ),
+                        ),
+                      );
+                    }),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    reason,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _translate(product.name),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "₹${((product.offerPrice != null && product.offerPrice! > 0) ? product.offerPrice! : product.price).toStringAsFixed(0)}",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

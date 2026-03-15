@@ -4,6 +4,7 @@ import '../../../../data/models/product_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../data/services/database_service.dart';
+import 'cart_controller.dart';
 import '../../../../core/constants/app_assets.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -13,6 +14,8 @@ class HomeController extends GetxController {
   final DatabaseService _databaseService = DatabaseService();
 
   var trendingProducts = <ProductModel>[].obs;
+  var personalizedProducts = <ProductModel>[].obs;
+  var recommendationReasons = <String, String>{}.obs;
   var categories = <Map<String, dynamic>>[].obs;
 
   @override
@@ -29,6 +32,8 @@ class HomeController extends GetxController {
         fetchCategories(),
         checkActiveOffer(), // Check for promo
       ]);
+      
+      await Get.find<CartController>().checkAbandonedCartRecovery();
     } catch (e) {
       print("Error in fetchData: $e");
       // Don't show error to user, just use fallback data
@@ -419,21 +424,17 @@ class HomeController extends GetxController {
     try {
       final products = await _databaseService.getProducts();
       if (products.isNotEmpty) {
-        // Sort by rating (highest first), then by review count
-        products.sort((a, b) {
-          // Primary sort: by rating (descending)
-          final ratingCompare = b.rating.compareTo(a.rating);
-          if (ratingCompare != 0) return ratingCompare;
-          
-          // Secondary sort: by review count (descending)
-          return b.reviewCount.compareTo(a.reviewCount);
-        });
-        
-        trendingProducts.assignAll(products);
+        final sortedTrending = List<ProductModel>.from(products)
+          ..sort((a, b) => _trendingScore(b).compareTo(_trendingScore(a)));
+
+        trendingProducts.assignAll(sortedTrending);
+        await _buildPersonalizedFeed(products);
       } else {
         print("No products found in database, using fallback data");
         // Fallback to dummy data if DB is empty
         trendingProducts.assignAll(_dummyProducts);
+        personalizedProducts.assignAll(_dummyProducts);
+        recommendationReasons.clear();
       }
     } catch (e) {
       print("Error fetching products: $e");
@@ -441,8 +442,166 @@ class HomeController extends GetxController {
       if (trendingProducts.isEmpty) {
         trendingProducts.assignAll(_dummyProducts);
       }
+      if (personalizedProducts.isEmpty) {
+        personalizedProducts.assignAll(_dummyProducts);
+        recommendationReasons.clear();
+      }
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  Future<void> refreshPersonalizedFeedFromCurrentProducts() async {
+    if (trendingProducts.isEmpty) return;
+    await _buildPersonalizedFeed(trendingProducts.toList());
+  }
+
+  double _trendingScore(ProductModel product) {
+    final normalizedOrders = (product.orderCount / 100).clamp(0.0, 1.0);
+    final normalizedRating = (product.rating / 5).clamp(0.0, 1.0);
+    final normalizedReviews = (product.reviewCount / 200).clamp(0.0, 1.0);
+    final offerBoost = (product.offerPrice != null && product.offerPrice! > 0) ? 0.08 : 0.0;
+    final stockPenalty = product.stockQuantity <= 0 ? -1.0 : 0.0;
+
+    return (normalizedOrders * 0.45) +
+        (normalizedRating * 0.30) +
+        (normalizedReviews * 0.17) +
+        offerBoost +
+        stockPenalty;
+  }
+
+  Future<void> _buildPersonalizedFeed(List<ProductModel> allProducts) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      personalizedProducts.assignAll(
+        allProducts
+            .where((p) => p.stockQuantity > 0)
+            .toList()
+          ..sort((a, b) => _trendingScore(b).compareTo(_trendingScore(a))),
+      );
+      recommendationReasons.clear();
+      return;
+    }
+
+    final signals = await _databaseService.getUserRecommendationSignals(user.uid);
+    final wishlistIds = Set<String>.from(signals['wishlistIds'] ?? <String>[]);
+    final viewedProductIds = Set<String>.from(signals['recentViewedProductIds'] ?? <String>[]);
+    final categoryViewScore = Map<String, int>.from(signals['categoryViewScore'] ?? <String, int>{});
+    final productViewScore = Map<String, int>.from(signals['productViewScore'] ?? <String, int>{});
+
+    final wishlistProducts = allProducts.where((p) => wishlistIds.contains(p.id)).toList();
+    final wishlistCategories = wishlistProducts.map((p) => p.category.toLowerCase()).toSet();
+    final preferredSizes = <String>{};
+    for (final item in wishlistProducts) {
+      preferredSizes.addAll(item.sizes.map((s) => s.toUpperCase()));
+    }
+
+    final avgWishlistPrice = wishlistProducts.isEmpty
+        ? null
+        : wishlistProducts.map((p) => p.price).reduce((a, b) => a + b) / wishlistProducts.length;
+
+    final maxCategoryView = categoryViewScore.values.isEmpty
+        ? 1
+        : categoryViewScore.values.reduce((a, b) => a > b ? a : b);
+    final maxProductView = productViewScore.values.isEmpty
+        ? 1
+        : productViewScore.values.reduce((a, b) => a > b ? a : b);
+
+    final scored = <MapEntry<ProductModel, double>>[];
+    final reasons = <String, String>{};
+
+    for (final product in allProducts) {
+      if (product.stockQuantity <= 0) continue;
+      if (wishlistIds.contains(product.id)) continue;
+
+      final categoryKey = product.category
+          .trim()
+          .toLowerCase()
+          .replaceAll('.', '_')
+          .replaceAll('/', '_')
+          .replaceAll(' ', '_');
+
+      final trend = _trendingScore(product).clamp(0.0, 1.0);
+      final categoryMatch = ((categoryViewScore[categoryKey] ?? 0) / maxCategoryView).clamp(0.0, 1.0);
+      final productAffinity = ((productViewScore[product.id] ?? 0) / maxProductView).clamp(0.0, 1.0);
+
+      double wishlistCategorySignal = wishlistCategories.contains(product.category.toLowerCase()) ? 1.0 : 0.0;
+
+      double sizeSignal = 0.0;
+      if (preferredSizes.isNotEmpty && product.sizes.isNotEmpty) {
+        final overlap = product.sizes.where((s) => preferredSizes.contains(s.toUpperCase())).length;
+        sizeSignal = (overlap / preferredSizes.length).clamp(0.0, 1.0);
+      }
+
+      double priceAffinitySignal = 0.0;
+      if (avgWishlistPrice != null && avgWishlistPrice > 0) {
+        final distance = (product.price - avgWishlistPrice).abs() / avgWishlistPrice;
+        priceAffinitySignal = (1 - distance).clamp(0.0, 1.0);
+      }
+
+      final recentlyViewedBoost = viewedProductIds.contains(product.id) ? 0.12 : 0.0;
+      final offerBoost = (product.offerPrice != null && product.offerPrice! > 0) ? 0.06 : 0.0;
+
+      // Keep rankings from getting stale by introducing a tiny deterministic exploration factor.
+      final daySeed = DateTime.now().difference(DateTime(2024, 1, 1)).inDays;
+      final exploration = (((product.id.hashCode ^ daySeed) & 1023) / 1023.0) * 0.03;
+
+      final score =
+          (trend * 0.30) +
+          (categoryMatch * 0.24) +
+          (productAffinity * 0.16) +
+          (wishlistCategorySignal * 0.12) +
+          (sizeSignal * 0.08) +
+          (priceAffinitySignal * 0.08) +
+          recentlyViewedBoost +
+          offerBoost +
+          exploration;
+
+      scored.add(MapEntry(product, score));
+
+      if (categoryMatch >= 0.7) {
+        reasons[product.id] = 'Based on your recent browsing';
+      } else if (wishlistCategorySignal > 0) {
+        reasons[product.id] = 'Matches items in your wishlist';
+      } else if (productAffinity >= 0.5) {
+        reasons[product.id] = 'Because you viewed this type often';
+      } else if (trend >= 0.6) {
+        reasons[product.id] = 'Trending with other shoppers';
+      } else if (offerBoost > 0) {
+        reasons[product.id] = 'Recommended deal for you';
+      } else {
+        reasons[product.id] = 'Picked for you';
+      }
+    }
+
+    scored.sort((a, b) => b.value.compareTo(a.value));
+
+    // Re-rank for diversity so recommendations do not over-cluster in one category.
+    final categoryQuota = <String, int>{};
+    final diversified = <ProductModel>[];
+    for (final item in scored) {
+      final key = item.key.category.toLowerCase();
+      final used = categoryQuota[key] ?? 0;
+      if (used >= 3) continue;
+      diversified.add(item.key);
+      categoryQuota[key] = used + 1;
+      if (diversified.length >= 12) break;
+    }
+
+    if (diversified.length < 12) {
+      for (final item in scored) {
+        if (diversified.contains(item.key)) continue;
+        diversified.add(item.key);
+        if (diversified.length >= 12) break;
+      }
+    }
+
+    if (diversified.isEmpty) {
+      personalizedProducts.assignAll(trendingProducts.take(12).toList());
+      recommendationReasons.clear();
+    } else {
+      personalizedProducts.assignAll(diversified);
+      recommendationReasons.assignAll(reasons);
     }
   }
 

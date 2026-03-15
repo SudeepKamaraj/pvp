@@ -412,6 +412,8 @@ class NotificationsScreen extends StatelessWidget {
 
   IconData _getIcon(String type) {
     switch (type) {
+      case 'abandoned_cart':
+        return Icons.shopping_cart_checkout_outlined;
       case 'order':
         return Icons.shopping_bag_outlined;
       case 'delivery':
@@ -427,6 +429,8 @@ class NotificationsScreen extends StatelessWidget {
 
   Color _getIconColor(String type) {
     switch (type) {
+      case 'abandoned_cart':
+        return Colors.deepOrange;
       case 'order':
         return Colors.blue;
       case 'delivery':

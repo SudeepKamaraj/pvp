@@ -48,6 +48,10 @@ class WishlistController extends GetxController {
       await _databaseService.toggleWishlist(user.uid, product.id, true);
       Get.snackbar("Added", "${product.name} added to wishlist");
     }
+
+    if (Get.isRegistered<HomeController>()) {
+      await Get.find<HomeController>().refreshPersonalizedFeedFromCurrentProducts();
+    }
   }
 
   bool isInWishlist(ProductModel product) {

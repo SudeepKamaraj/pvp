@@ -7,6 +7,15 @@ import '../models/review_model.dart';
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  String _normalizeCategoryKey(String category) {
+    return category
+        .trim()
+        .toLowerCase()
+        .replaceAll('.', '_')
+        .replaceAll('/', '_')
+        .replaceAll(' ', '_');
+  }
+
   // Products
   Future<List<ProductModel>> getProducts() async {
     final snapshot = await _db.collection('products').get();
@@ -198,6 +207,234 @@ class DatabaseService {
       await _db.collection('users').doc(userId).update({
         'wishlist': FieldValue.arrayRemove([productId])
       });
+    }
+  }
+
+  // Cart persistence
+  Future<void> saveUserCart(String userId, List<CartItemModel> items) async {
+    final cartRef = _db.collection('carts').doc(userId);
+
+    await cartRef.set({
+      'userId': userId,
+      'items': items.map((item) => {
+        'id': item.id,
+        'productId': item.product.id,
+        'productName': item.product.name,
+        'selectedSize': item.selectedSize,
+        'quantity': item.quantity,
+        'category': item.product.category,
+        'price': item.product.price,
+        'offerPrice': item.product.offerPrice,
+        'imageUrl': item.product.imageUrl,
+        'images': item.product.images,
+        'sizes': item.product.sizes,
+        'colors': item.product.colors,
+        'stockQuantity': item.product.stockQuantity,
+        'rating': item.product.rating,
+        'reviewCount': item.product.reviewCount,
+        'orderCount': item.product.orderCount,
+      }).toList(),
+      'itemCount': items.fold<int>(0, (sum, item) => sum + item.quantity),
+      'totalAmount': items.fold<double>(0, (sum, item) => sum + item.totalPrice),
+      'updatedAt': FieldValue.serverTimestamp(),
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<List<CartItemModel>> getUserCart(String userId) async {
+    final snapshot = await _db.collection('carts').doc(userId).get();
+    if (!snapshot.exists || snapshot.data() == null) {
+      return [];
+    }
+
+    final data = snapshot.data()!;
+    final rawItems = List<Map<String, dynamic>>.from(data['items'] ?? []);
+    return rawItems.map(_mapStoredCartItem).toList();
+  }
+
+  Future<void> clearUserCart(String userId) async {
+    await _db.collection('carts').doc(userId).delete();
+  }
+
+  CartItemModel _mapStoredCartItem(Map<String, dynamic> item) {
+    return CartItemModel(
+      id: item['id'] ?? '',
+      product: ProductModel(
+        id: item['productId'] ?? '',
+        name: item['productName'] ?? '',
+        category: item['category'] ?? '',
+        price: (item['price'] as num? ?? 0).toDouble(),
+        offerPrice: item['offerPrice'] != null ? (item['offerPrice'] as num).toDouble() : null,
+        imageUrl: item['imageUrl'] ?? '',
+        images: List<String>.from(item['images'] ?? []),
+        sizes: List<String>.from(item['sizes'] ?? []),
+        colors: List<String>.from(item['colors'] ?? []),
+        stockQuantity: item['stockQuantity'] ?? 0,
+        rating: (item['rating'] as num? ?? 0).toDouble(),
+        reviewCount: item['reviewCount'] ?? 0,
+        orderCount: item['orderCount'] ?? 0,
+      ),
+      selectedSize: item['selectedSize'] ?? '',
+      quantity: item['quantity'] ?? 1,
+    );
+  }
+
+  Future<void> maybeCreateAbandonedCartRecoveryNotification({
+    required String userId,
+    Duration inactivityThreshold = const Duration(hours: 6),
+  }) async {
+    try {
+      final cartRef = _db.collection('carts').doc(userId);
+      final cartDoc = await cartRef.get();
+      if (!cartDoc.exists || cartDoc.data() == null) return;
+
+      final cartData = cartDoc.data()!;
+      final rawItems = List<Map<String, dynamic>>.from(cartData['items'] ?? []);
+      if (rawItems.isEmpty) return;
+
+      final updatedAt = (cartData['updatedAt'] as Timestamp?)?.toDate() ??
+          (cartData['createdAt'] as Timestamp?)?.toDate();
+      if (updatedAt == null) return;
+
+      final now = DateTime.now();
+      if (now.difference(updatedAt) < inactivityThreshold) return;
+
+      final lastReminderAt = (cartData['lastReminderAt'] as Timestamp?)?.toDate();
+      if (lastReminderAt != null && !lastReminderAt.isBefore(updatedAt)) {
+        return;
+      }
+
+      final recentOrders = await getUserOrders(userId);
+      if (recentOrders.any((order) => order.date.isAfter(updatedAt.subtract(const Duration(minutes: 5))))) {
+        return;
+      }
+
+      final cartItems = rawItems.map(_mapStoredCartItem).toList();
+      final primaryItem = cartItems.first;
+      final recommendedProduct = await _findRecoveryRecommendation(cartItems);
+
+      final title = 'Your cart is waiting';
+      final body = recommendedProduct == null
+          ? 'You left ${cartItems.length} item${cartItems.length == 1 ? '' : 's'} in your cart, including ${primaryItem.product.name}. Complete your order before it sells out.'
+          : 'You left ${cartItems.length} item${cartItems.length == 1 ? '' : 's'} in your cart, including ${primaryItem.product.name}. Complete your order and you may also like ${recommendedProduct.name}.';
+
+      await createNotification(
+        userId: userId,
+        title: title,
+        body: body,
+        type: 'abandoned_cart',
+        data: {
+          'cartItemCount': cartItems.length,
+          'cartProductIds': cartItems.map((item) => item.product.id).toList(),
+          'recommendedProductId': recommendedProduct?.id,
+        },
+      );
+
+      await cartRef.set({
+        'lastReminderAt': FieldValue.serverTimestamp(),
+        'reminderCount': FieldValue.increment(1),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error creating abandoned cart reminder: $e');
+    }
+  }
+
+  Future<ProductModel?> _findRecoveryRecommendation(List<CartItemModel> cartItems) async {
+    final cartProductIds = cartItems.map((item) => item.product.id).toSet();
+    final cartCategories = cartItems.map((item) => item.product.category.toLowerCase()).toSet();
+    final preferredSizes = cartItems.map((item) => item.selectedSize.toUpperCase()).toSet();
+    final averagePrice = cartItems.fold<double>(0, (sum, item) => sum + item.product.price) / cartItems.length;
+
+    final products = await getProducts();
+    ProductModel? bestProduct;
+    double bestScore = -1;
+
+    for (final product in products) {
+      if (cartProductIds.contains(product.id) || product.stockQuantity <= 0) continue;
+
+      final categoryScore = cartCategories.contains(product.category.toLowerCase()) ? 1.0 : 0.0;
+      final sizeOverlap = product.sizes.where((size) => preferredSizes.contains(size.toUpperCase())).length;
+      final sizeScore = preferredSizes.isEmpty ? 0.0 : (sizeOverlap / preferredSizes.length).clamp(0.0, 1.0);
+      final trendScore = ((product.orderCount / 100).clamp(0.0, 1.0) * 0.5) +
+          ((product.rating / 5).clamp(0.0, 1.0) * 0.3) +
+          ((product.reviewCount / 200).clamp(0.0, 1.0) * 0.2);
+      final priceDistance = averagePrice == 0 ? 1.0 : ((product.price - averagePrice).abs() / averagePrice);
+      final priceScore = (1 - priceDistance).clamp(0.0, 1.0);
+
+      final score = (categoryScore * 0.45) +
+          (trendScore * 0.30) +
+          (sizeScore * 0.15) +
+          (priceScore * 0.10);
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestProduct = product;
+      }
+    }
+
+    return bestProduct;
+  }
+
+  // Recommendation signals
+  Future<void> trackProductView({
+    required String userId,
+    required ProductModel product,
+  }) async {
+    try {
+      final userRef = _db.collection('users').doc(userId);
+      final categoryKey = _normalizeCategoryKey(product.category);
+
+      await userRef.set({
+        'recentViewedProductIds': FieldValue.arrayUnion([product.id]),
+        'recentViewedCategories': FieldValue.arrayUnion([product.category]),
+        'lastViewedProductId': product.id,
+        'lastViewedAt': FieldValue.serverTimestamp(),
+        'categoryViewScore.$categoryKey': FieldValue.increment(1),
+        'productViewScore.${product.id}': FieldValue.increment(1),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      // Recommendation telemetry should never block UX
+      print('Error tracking product view: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getUserRecommendationSignals(String userId) async {
+    try {
+      final userDoc = await _db.collection('users').doc(userId).get();
+      final data = userDoc.data() ?? <String, dynamic>{};
+
+      final wishlistIds = List<String>.from(data['wishlist'] ?? []);
+      final recentViewedProductIds = List<String>.from(data['recentViewedProductIds'] ?? []);
+      final recentViewedCategories = List<String>.from(data['recentViewedCategories'] ?? []);
+
+      final categoryViewRaw = Map<String, dynamic>.from(data['categoryViewScore'] ?? {});
+      final categoryViewScore = <String, int>{
+        for (final entry in categoryViewRaw.entries)
+          entry.key: (entry.value as num?)?.toInt() ?? 0,
+      };
+
+      final productViewRaw = Map<String, dynamic>.from(data['productViewScore'] ?? {});
+      final productViewScore = <String, int>{
+        for (final entry in productViewRaw.entries)
+          entry.key: (entry.value as num?)?.toInt() ?? 0,
+      };
+
+      return {
+        'wishlistIds': wishlistIds,
+        'recentViewedProductIds': recentViewedProductIds,
+        'recentViewedCategories': recentViewedCategories,
+        'categoryViewScore': categoryViewScore,
+        'productViewScore': productViewScore,
+      };
+    } catch (e) {
+      print('Error getting user recommendation signals: $e');
+      return {
+        'wishlistIds': <String>[],
+        'recentViewedProductIds': <String>[],
+        'recentViewedCategories': <String>[],
+        'categoryViewScore': <String, int>{},
+        'productViewScore': <String, int>{},
+      };
     }
   }
 

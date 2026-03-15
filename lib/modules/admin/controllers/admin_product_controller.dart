@@ -39,12 +39,32 @@ class AdminProductController extends GetxController {
   var uploadedImages = <String>[].obs;
   var uploadedVideos = <String>[].obs;
 
+  static const List<String> _sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+  List<String> _sortSizes(Iterable<String> sizes) {
+    final orderMap = {
+      for (int i = 0; i < _sizeOrder.length; i++) _sizeOrder[i]: i,
+    };
+
+    final sorted = List<String>.from(sizes);
+    sorted.sort((a, b) {
+      final aKey = a.toUpperCase();
+      final bKey = b.toUpperCase();
+      final aIndex = orderMap[aKey] ?? 999;
+      final bIndex = orderMap[bKey] ?? 999;
+      if (aIndex != bIndex) return aIndex.compareTo(bIndex);
+      return aKey.compareTo(bKey);
+    });
+    return sorted;
+  }
+
   void toggleSize(String size) {
     if (selectedSizes.contains(size)) {
       selectedSizes.remove(size);
     } else {
       selectedSizes.add(size);
     }
+    selectedSizes.value = _sortSizes(selectedSizes);
   }
 
   void toggleColor(String color) {
@@ -152,7 +172,7 @@ class AdminProductController extends GetxController {
     imageUrlController.text = product.imageUrl;
     offerPriceController.text = product.offerPrice?.toString() ?? "";
     stockController.text = product.stockQuantity.toString();
-    selectedSizes.value = List<String>.from(product.sizes);
+    selectedSizes.value = _sortSizes(product.sizes);
     selectedColors.value = List<String>.from(product.colors);
     uploadedImages.value = product.images.where((img) => img.startsWith('data:image')).toList();
     if (uploadedImages.isEmpty && product.imageUrl.isNotEmpty) {
@@ -212,7 +232,7 @@ class AdminProductController extends GetxController {
         rating: 0.0,
         offerPrice: double.tryParse(offerPriceController.text),
         stockQuantity: int.tryParse(stockController.text) ?? 0,
-        sizes: selectedSizes.toList(),
+        sizes: _sortSizes(selectedSizes),
         colors: selectedColors.toList(),
         images: uploadedImages.toList(),
         videos: uploadedVideos.toList(),

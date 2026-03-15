@@ -16,6 +16,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'dart:math' as math;
 import 'checkout_screen.dart';
+import '../../../../data/services/database_service.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final ProductModel product;
@@ -34,13 +35,41 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen> with Single
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
   int _currentImageIndex = 0;
+  final DatabaseService _databaseService = DatabaseService();
+
+  static const List<String> _sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+  List<String> _sortSizes(Iterable<String> sizes) {
+    final orderMap = {
+      for (int i = 0; i < _sizeOrder.length; i++) _sizeOrder[i]: i,
+    };
+
+    final sorted = List<String>.from(sizes);
+    sorted.sort((a, b) {
+      final aKey = a.toUpperCase();
+      final bKey = b.toUpperCase();
+      final aIndex = orderMap[aKey] ?? 999;
+      final bIndex = orderMap[bKey] ?? 999;
+      if (aIndex != bIndex) return aIndex.compareTo(bIndex);
+      return aKey.compareTo(bKey);
+    });
+    return sorted;
+  }
 
   @override
   void initState() {
     super.initState();
     _sizes = widget.product.sizes.isNotEmpty 
-        ? widget.product.sizes 
-        : ['S', 'M', 'L', 'XL', 'XXL']; // Fallback
+        ? _sortSizes(widget.product.sizes)
+        : ['XS', 'S', 'M', 'L', 'XL', 'XXL']; // Fallback
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      _databaseService.trackProductView(
+        userId: currentUser.uid,
+        product: widget.product,
+      );
+    }
         
     _reviewsController = Get.put(ProductReviewsController(widget.product.id), tag: widget.product.id);
     
