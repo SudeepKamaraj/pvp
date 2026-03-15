@@ -49,8 +49,35 @@ service cloud.firestore {
                      (resource.data.userId == request.auth.uid || 
                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
       allow create: if request.auth != null;
-      allow update: if request.auth != null && 
-                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow update: if request.auth != null && (
+                       // Admin can fully manage order updates
+                       get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+                       // Customer can only submit cancellation/return requests for own order
+                       (
+                         resource.data.userId == request.auth.uid &&
+                         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                           'status',
+                           'cancelRequest',
+                           'returnRequest',
+                           'refundStatus',
+                           'refundUpdatedAt',
+                           'updatedAt'
+                         ]) &&
+                         (
+                           (
+                             resource.data.status in ['New', 'Pending', 'Processing'] &&
+                             request.resource.data.status == 'Cancellation Requested' &&
+                             request.resource.data.cancelRequest.requestedBy == request.auth.uid
+                           ) ||
+                           (
+                             resource.data.status == 'Delivered' &&
+                             request.resource.data.status == 'Return Requested' &&
+                             request.resource.data.returnRequest.requestedBy == request.auth.uid &&
+                             request.resource.data.refundStatus == 'Pending'
+                           )
+                         )
+                       )
+                     );
     }
     
     // Notifications collection

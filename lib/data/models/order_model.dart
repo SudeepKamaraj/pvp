@@ -39,6 +39,10 @@ class OrderModel {
   final String? paymentId; // Razorpay payment ID
   final String? razorpayOrderId; // Razorpay order ID
   final String? razorpaySignature; // Razorpay signature
+  final Map<String, dynamic>? cancellationRequest;
+  final Map<String, dynamic>? returnRequest;
+  final String? refundStatus;
+  final DateTime? refundUpdatedAt;
 
   OrderModel({
     required this.id,
@@ -62,5 +66,9 @@ class OrderModel {
     this.paymentId,
     this.razorpayOrderId,
     this.razorpaySignature,
+    this.cancellationRequest,
+    this.returnRequest,
+    this.refundStatus,
+    this.refundUpdatedAt,
   });
 }

@@ -51,6 +51,97 @@ class CustomerOrderController extends GetxController {
     }
   }
 
+  Future<void> requestOrderCancellation(OrderModel order, {required String reason}) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      Get.snackbar("Error", "Please login to continue");
+      return;
+    }
+
+    final status = order.status.toLowerCase();
+    final cancellableStatuses = {'new', 'pending', 'processing'};
+    if (!cancellableStatuses.contains(status)) {
+      Get.snackbar("Not Allowed", "This order cannot be cancelled at this stage");
+      return;
+    }
+
+    if (DateTime.now().difference(order.date) > const Duration(hours: 1)) {
+      Get.snackbar("Window Closed", "Cancellation is available only within 1 hour of ordering");
+      return;
+    }
+
+    isLoading.value = true;
+    try {
+      await _databaseService.requestOrderCancellation(
+        orderId: order.id,
+        userId: user.uid,
+        reason: reason,
+      );
+
+      await _databaseService.createNotification(
+        userId: user.uid,
+        title: 'Cancellation Requested',
+        body: 'Your cancellation request for order #${order.id.substring(0, 8)} has been submitted.',
+        type: 'order',
+        data: {'orderId': order.id, 'requestType': 'cancellation'},
+      );
+
+      await fetchMyOrders();
+      Get.snackbar("Request Submitted", "We received your cancellation request");
+    } catch (e) {
+      Get.snackbar("Error", "Failed to request cancellation: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> requestOrderReturn(
+    OrderModel order, {
+    required String reason,
+    DateTime? pickupDate,
+  }) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      Get.snackbar("Error", "Please login to continue");
+      return;
+    }
+
+    if (order.status.toLowerCase() != 'delivered') {
+      Get.snackbar("Not Allowed", "Returns are available only for delivered orders");
+      return;
+    }
+
+    if (DateTime.now().difference(order.date) > const Duration(days: 7)) {
+      Get.snackbar("Window Closed", "Return window is 7 days from delivery");
+      return;
+    }
+
+    isLoading.value = true;
+    try {
+      await _databaseService.requestOrderReturn(
+        orderId: order.id,
+        userId: user.uid,
+        reason: reason,
+        pickupDate: pickupDate,
+      );
+
+      await _databaseService.createNotification(
+        userId: user.uid,
+        title: 'Return Requested',
+        body: 'Your return request for order #${order.id.substring(0, 8)} is under review.',
+        type: 'order',
+        data: {'orderId': order.id, 'requestType': 'return'},
+      );
+
+      await fetchMyOrders();
+      Get.snackbar("Request Submitted", "Return request created successfully");
+    } catch (e) {
+      Get.snackbar("Error", "Failed to request return: $e");
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   void contactSupport() {
     Get.to(() => const HelpSupportScreen());
   }

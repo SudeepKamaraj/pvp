@@ -108,6 +108,43 @@ class OrderDetailsScreen extends StatelessWidget {
                 ],
               ),
             ),
+            if (order.status == 'Cancellation Requested' || order.status == 'Return Requested' || order.status == 'Returned') ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.orange[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      order.status,
+                      style: GoogleFonts.poppins(fontWeight: FontWeight.bold, color: Colors.deepOrange),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      order.status == 'Cancellation Requested'
+                          ? 'Your cancellation request is under review.'
+                          : order.status == 'Return Requested'
+                              ? 'Return request submitted. Pickup will be scheduled shortly.'
+                              : 'Return has been completed.',
+                      style: GoogleFonts.poppins(fontSize: 12, color: Colors.grey[700]),
+                    ),
+                    if (order.refundStatus != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        'Refund Status: ${order.refundStatus}',
+                        style: GoogleFonts.poppins(fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 30),
 
             // Order Progress

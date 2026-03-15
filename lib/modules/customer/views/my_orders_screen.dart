@@ -61,14 +61,14 @@ class MyOrdersScreen extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 16),
           itemBuilder: (context, index) {
             final order = controller.myOrders[index];
-            return _buildOrderCard(order);
+            return _buildOrderCard(context, order);
           },
         );
       }),
     );
   }
 
-  Widget _buildOrderCard(OrderModel order) {
+  Widget _buildOrderCard(BuildContext context, OrderModel order) {
     Color statusColor;
     Color statusBgColor;
 
@@ -88,6 +88,18 @@ class MyOrdersScreen extends StatelessWidget {
       case 'cancelled':
         statusColor = Colors.red;
         statusBgColor = Colors.red[50]!;
+        break;
+      case 'cancellation requested':
+        statusColor = Colors.red[700]!;
+        statusBgColor = Colors.red[50]!;
+        break;
+      case 'return requested':
+        statusColor = Colors.deepOrange;
+        statusBgColor = Colors.orange[50]!;
+        break;
+      case 'returned':
+        statusColor = Colors.purple;
+        statusBgColor = Colors.purple[50]!;
         break;
       default:
         statusColor = Colors.grey;
@@ -214,67 +226,216 @@ class MyOrdersScreen extends StatelessWidget {
           const Divider(height: 1),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
+            child: Column(
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Get.to(() => OrderDetailsScreen(order: order)),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.grey[200]!),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Get.to(() => OrderDetailsScreen(order: order)),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: Colors.grey[200]!),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        ),
+                        child: Text("details".tr, style: GoogleFonts.poppins(color: Colors.black, fontSize: 12)),
+                      ),
                     ),
-                    child: Text("details".tr, style: GoogleFonts.poppins(color: Colors.black, fontSize: 12)),
-                  ),
+                    const SizedBox(width: 12),
+                    if (order.status.toLowerCase() == 'cancelled')
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            Get.defaultDialog(
+                              title: "Delete Order",
+                              middleText: "Are you sure you want to remove this order from your history?",
+                              textConfirm: "Delete",
+                              textCancel: "Cancel",
+                              confirmTextColor: Colors.white,
+                              buttonColor: Colors.red,
+                              onConfirm: () {
+                                if (Get.isDialogOpen ?? false) {
+                                  Get.back();
+                                }
+                                Get.find<CustomerOrderController>().deleteOrder(order.id);
+                              }
+                            );
+                          },
+                          icon: const Icon(Icons.delete_outline, size: 16, color: Colors.white),
+                          label: Text("Delete", style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            elevation: 0,
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => Get.to(() => OrderDetailsScreen(order: order)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            "track_order".tr,
+                            style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                if (order.status.toLowerCase() == 'cancelled')
-                  Expanded(
-                    child: ElevatedButton.icon(
+                if (_canCancelOrder(order) || _canReturnOrder(order)) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
                       onPressed: () {
-                        // Confirm deletion dialog
-                        Get.defaultDialog(
-                          title: "Delete Order",
-                          middleText: "Are you sure you want to remove this order from your history?",
-                          textConfirm: "Delete",
-                          textCancel: "Cancel",
-                          confirmTextColor: Colors.white,
-                          buttonColor: Colors.red,
-                          onConfirm: () {
-                            if (Get.isDialogOpen ?? false) {
-                              Get.back();
-                            }
-                            Get.find<CustomerOrderController>().deleteOrder(order.id);
-                          }
-                        );
+                        if (_canCancelOrder(order)) {
+                          _showCancellationDialog(order);
+                        } else {
+                          _showReturnDialog(context, order);
+                        }
                       },
-                      icon: const Icon(Icons.delete_outline, size: 16, color: Colors.white),
-                      label: Text("Delete", style: GoogleFonts.poppins(color: Colors.white, fontSize: 12)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        elevation: 0,
+                      icon: Icon(
+                        _canCancelOrder(order) ? Icons.cancel_outlined : Icons.assignment_return_outlined,
+                        size: 16,
+                        color: _canCancelOrder(order) ? Colors.red : Colors.deepOrange,
                       ),
-                    ),
-                  )
-                else
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => Get.to(() => OrderDetailsScreen(order: order)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        elevation: 0,
+                      label: Text(
+                        _canCancelOrder(order) ? 'Cancel Order' : 'Request Return',
+                        style: GoogleFonts.poppins(
+                          color: _canCancelOrder(order) ? Colors.red : Colors.deepOrange,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
                       ),
-                      child: Text(
-                        "track_order".tr,
-                        style: GoogleFonts.poppins(color: Colors.white, fontSize: 12),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: _canCancelOrder(order) ? Colors.red[200]! : Colors.orange[300]!),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       ),
                     ),
                   ),
+                ],
               ],
             ),
           )
         ],
+      ),
+    );
+  }
+
+  bool _canCancelOrder(OrderModel order) {
+    const cancellable = {'new', 'pending', 'processing'};
+    final status = order.status.toLowerCase();
+    final withinWindow = DateTime.now().difference(order.date) <= const Duration(hours: 1);
+    return cancellable.contains(status) && withinWindow;
+  }
+
+  bool _canReturnOrder(OrderModel order) {
+    final status = order.status.toLowerCase();
+    final withinWindow = DateTime.now().difference(order.date) <= const Duration(days: 7);
+    return status == 'delivered' && withinWindow;
+  }
+
+  void _showCancellationDialog(OrderModel order) {
+    final reasonController = TextEditingController();
+    Get.dialog(
+      AlertDialog(
+        title: const Text('Cancel Order'),
+        content: TextField(
+          controller: reasonController,
+          maxLines: 3,
+          decoration: const InputDecoration(
+            hintText: 'Reason for cancellation',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Get.back(), child: const Text('Keep Order')),
+          ElevatedButton(
+            onPressed: () async {
+              final reason = reasonController.text.trim();
+              if (reason.isEmpty) {
+                Get.snackbar('Required', 'Please provide a cancellation reason');
+                return;
+              }
+              Get.back();
+              await Get.find<CustomerOrderController>().requestOrderCancellation(order, reason: reason);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Submit Request'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showReturnDialog(BuildContext context, OrderModel order) {
+    final reasonController = TextEditingController();
+    DateTime? pickupDate;
+
+    Get.dialog(
+      StatefulBuilder(
+        builder: (dialogContext, setState) {
+          return AlertDialog(
+            title: const Text('Return Order'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: reasonController,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                    hintText: 'Reason for return',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final selected = await showDatePicker(
+                      context: context,
+                      initialDate: DateTime.now().add(const Duration(days: 1)),
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 14)),
+                    );
+                    if (selected != null) {
+                      setState(() => pickupDate = selected);
+                    }
+                  },
+                  icon: const Icon(Icons.calendar_today, size: 16),
+                  label: Text(
+                    pickupDate == null
+                        ? 'Schedule pickup (optional)'
+                        : 'Pickup: ${pickupDate!.day}/${pickupDate!.month}/${pickupDate!.year}',
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Get.back(), child: const Text('Cancel')),
+              ElevatedButton(
+                onPressed: () async {
+                  final reason = reasonController.text.trim();
+                  if (reason.isEmpty) {
+                    Get.snackbar('Required', 'Please provide a return reason');
+                    return;
+                  }
+                  Get.back();
+                  await Get.find<CustomerOrderController>().requestOrderReturn(
+                    order,
+                    reason: reason,
+                    pickupDate: pickupDate,
+                  );
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange),
+                child: const Text('Submit Return'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
